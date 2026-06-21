@@ -55,3 +55,29 @@ This starts the PostgreSQL PostGIS container mapped to port 5434.
    npm run dev
    ```
 3. Open `http://localhost:5173` in your browser.
+
+## Configuration / Environment Variables
+
+The backend relies on the following environment variables. In a production environment or for custom local setups, these should be configured:
+
+- `SPRING_DATASOURCE_URL`: JDBC URL for PostgreSQL (default: `jdbc:postgresql://localhost:5434/cleanroute_db`)
+- `SPRING_DATASOURCE_USERNAME`: Database user (default: `postgres`)
+- `SPRING_DATASOURCE_PASSWORD`: Database password (default: `bhuvan#15`)
+- `TOMTOM_API_KEY`: API Key for the TomTom Routing API. A hardcoded fallback is currently used if not provided.
+
+## API Reference
+
+The application exposes the following REST APIs:
+
+### Authentication (`/api/v1/auth`)
+- `POST /signup`: Register a new user (requires `name`, `email`, `password`).
+- `POST /login`: Authenticate a user (requires `email`, `password`). Returns the user profile.
+- `POST /preferences`: Update user allergy sensitivities (requires `userId`, and `avoidPm25`, `avoidOzone`, `avoidPm10`, `avoidNo2` booleans).
+
+### Routes (`/api/v1/routes`)
+- `POST /`: Create and save a new route to the database.
+- `POST /alternatives`: Fetch road-snapped alternative routes between a start and end point, scored and ranked by pollution exposure.
+
+## License
+
+MIT License.
