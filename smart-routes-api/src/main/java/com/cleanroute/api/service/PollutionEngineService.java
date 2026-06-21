@@ -2,6 +2,8 @@ package com.cleanroute.api.service;
 
 import com.cleanroute.api.entity.Route;
 import com.cleanroute.api.entity.RouteMetrics;
+import com.cleanroute.api.entity.User;
+import com.cleanroute.api.dto.PollutionData;
 import com.cleanroute.api.service.integration.OpenMeteoAqiClient;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.LineString;
@@ -26,7 +28,14 @@ public class PollutionEngineService {
      * queries AQI for a spatial sample, and averages the results.
      */
     public RouteMetrics calculateExposureScore(Route route) {
-        
+        return calculateExposureScore(route, null);
+    }
+
+    /**
+     * Calculates the pollution exposure score for a given route,
+     * applying weights for any user allergy preferences.
+     */
+    public RouteMetrics calculateExposureScore(Route route, User user) {
         LineString path = route.getPath();
         Coordinate[] coordinates = path.getCoordinates();
 
@@ -34,7 +43,7 @@ public class PollutionEngineService {
             throw new IllegalArgumentException("Route path must have at least one coordinate");
         }
 
-        double totalAqi = 0.0;
+        double totalScore = 0.0;
         int sampleCount = 0;
 
         // Sample every Nth coordinate to avoid excessive API calls
@@ -43,28 +52,45 @@ public class PollutionEngineService {
 
         for (int i = 0; i < coordinates.length; i += step) {
             Coordinate coord = coordinates[i];
-            Double currentAqi = aqiClient.getCurrentAqi(coord.y, coord.x); // Y is lat, X is lon
+            PollutionData data = aqiClient.getPollutionData(coord.y, coord.x); // Y is lat, X is lon
             
-            if (currentAqi != null) {
-                totalAqi += currentAqi;
+            if (data != null) {
+                double pointScore = data.getAqi(); // Base european AQI
+                
+                // Apply allergy penalties
+                if (user != null) {
+                    if (Boolean.TRUE.equals(user.getAvoidPm25())) {
+                        pointScore += data.getPm25() * 1.5; // Penalize PM2.5 (ug/m3)
+                    }
+                    if (Boolean.TRUE.equals(user.getAvoidOzone())) {
+                        pointScore += data.getOzone() * 1.2; // Penalize Ozone (ug/m3)
+                    }
+                    if (Boolean.TRUE.equals(user.getAvoidPm10())) {
+                        pointScore += data.getPm10() * 1.0; // Penalize PM10 (ug/m3)
+                    }
+                    if (Boolean.TRUE.equals(user.getAvoidNo2())) {
+                        pointScore += data.getNo2() * 1.2; // Penalize NO2 (ug/m3)
+                    }
+                }
+                
+                totalScore += pointScore;
                 sampleCount++;
             }
         }
 
-        Double avgAqi;
+        Double avgScore;
         if (sampleCount == 0) {
             logger.warn("Could not fetch AQI for any coordinate on route: {}", route.getId());
-            avgAqi = 50.0; // Fallback "Moderate" score
+            avgScore = 50.0; // Fallback "Moderate" score
         } else {
-            avgAqi = totalAqi / sampleCount;
+            avgScore = totalScore / sampleCount;
         }
 
         // Apply hypothetical traffic factor if available (Optional for MVP).
         double trafficFactor = 1.0; 
-        double distanceWeight = route.getDistanceKm() != null ? route.getDistanceKm() : 1.0;
         
         // Final exposure score balances the AQI and the distance spent traveling
-        double exposureScore = avgAqi * trafficFactor;
+        double exposureScore = avgScore * trafficFactor;
 
         RouteMetrics metrics = new RouteMetrics();
         metrics.setRoute(route);

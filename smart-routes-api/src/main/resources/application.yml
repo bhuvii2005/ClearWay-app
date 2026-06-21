@@ -2,7 +2,7 @@ spring:
   application:
     name: smart-routes-api
   datasource:
-    url: jdbc:postgresql://localhost:5432/cleanroute_db
+    url: jdbc:postgresql://localhost:5434/cleanroute_db
     username: postgres
     password: bhuvan#15
     driver-class-name: org.postgresql.Driver
@@ -20,6 +20,10 @@ spring:
 
 server:
   port: 8080
+
+tomtom:
+  api:
+    key: uHuFXjmEsGuVVmVBqmDAzALCFZ92h2vY
 
 logging:
   level:

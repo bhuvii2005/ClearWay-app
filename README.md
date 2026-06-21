@@ -1,73 +1,57 @@
-# ClearWay 🌱
+# ClearWay
 
-An app designed to help you find the healthiest way to travel. ClearWay is a full-stack web application designed to calculate real-time pollution exposure along user-defined travel paths and help people find cleaner alternatives.
+ClearWay is a full-stack web application designed to calculate real-time pollution exposure along commuter travel paths and recommend cleaner alternative routes.
 
-## 🚀 What it does (MVP)
+## Features
 
-* **Interactive Map:** A sleek, dark-mode map built with React, Tailwind, and Leaflet.
-* **Live Air Quality:** Hooks into the free Open-Meteo API to check the pollution index right now.
-* **Spatial Database:** Saves your routes natively as geographic shapes using PostGIS.
-* **Background Tracking:** A Spring Boot worker constantly monitors saved routes every 15 minutes to track daily trends.
-* **Local Time Sync:** Automatically adjusts the API fetch requests to match your local timezone so the alerts are accurate.
+* **Geospatial Map:** Interactive map built with React and Leaflet.
+* **Real Street Routing:** Snaps waypoints to actual roads and generates up to three alternative routes via the TomTom Routing API.
+* **Live Air Quality:** Queries the Open-Meteo Air Quality API for real-time measurements of AQI, PM2.5, PM10, CO, NO2, and Ozone.
+* **Secure Authentication:** Built-in registration and login features securing user profiles with SHA-256 salted password hashing.
+* **Allergy Avoidance Toggles:** Allows users to select sensitivity triggers (PM2.5, Ozone, PM10, NO2). The routing engine dynamically adds weight penalties to segments high in selected pollutants, immediately re-prioritizing cleaner options on the map.
+* **Commute Scheduler:** Background worker running every 15 minutes to evaluate exposure trends along saved active routes and trigger warnings.
 
-## 🛠️ Built With
+## Tech Stack
 
-* **Frontend:** React (Vite), Tailwind CSS, React-Leaflet
-* **Backend:** Java 17, Spring Boot 3, Hibernate Spatial
-* **Database:** PostgreSQL 18 with the PostGIS extension
+* **Frontend:** React 19 (Vite), Tailwind CSS v4, React-Leaflet, Axios
+* **Backend:** Java 17, Spring Boot 3, Hibernate Spatial, Spring Data JPA
+* **Database:** PostgreSQL 15+ with the PostGIS extension, managed inside a Docker container
+* **Migrations:** Flyway Database Migrations
 
-## 📦 How to run this locally
+## Setup Guide
 
-### What you need first
+### 1. Start the Database (Docker)
 
-* Java 17 or higher
-* Node.js
-* Local PostgreSQL database with PostGIS installed
+Ensure Docker Desktop is running on your machine. Start the PostGIS database container in the root directory:
+```bash
+docker compose up -d
+```
+This starts the PostgreSQL PostGIS container mapped to port 5434.
 
-### 1. Database Setup
+### 2. Start the Backend API
 
-1. Create a PostgreSQL database called `cleanroute_db`.
-2. Turn on PostGIS by running this query:
-   ```sql
-   CREATE EXTENSION postgis;
-   ```
-3. Make sure your local Postgres username is `postgres` and password is `bhuvan#15` (or just change it in the `application.yml` file).
-
-### 2. Start the Backend
-
-1. Go into the backend folder:
+1. Navigate to the backend directory:
    ```bash
    cd smart-routes-api
    ```
-2. Make sure your terminal is using Java 17. (For Windows PowerShell, it looks something like this):
+2. Configure the Java 17 path (Windows PowerShell example):
    ```powershell
    $env:JAVA_HOME="C:\Program Files\Java\jdk-17.0.2"; $env:Path="$env:JAVA_HOME\bin;$env:Path"
    ```
-3. Run the Spring Boot server! Flyway will handle creating the database tables and setting up a test user automatically:
+3. Run the Spring Boot server (Flyway migrations will run automatically on startup):
    ```bash
-   .\gradlew bootRun
+   ./gradlew bootRun
    ```
 
-### 3. Start the Frontend
+### 3. Start the Frontend Server
 
-1. Open a new terminal window and go to the frontend folder:
+1. Navigate to the frontend directory:
    ```bash
    cd smart-routes-ui
    ```
-2. Install the npm packages and start Vite:
+2. Install dependencies and start the Vite server:
    ```bash
    npm install
    npm run dev
    ```
-3. Open your browser to `http://localhost:5173/` and test it out!
-
-## 📄 Docs
-
-* Want to know the exact requirements? Read the [Software_Requirements_Specification.md](Software_Requirements_Specification.md).
-* Want to see how the architecture works under the hood? Read the [Software_Design_Document.md](Software_Design_Document.md).
-
-## 🔮 What's Next?
-
-* **Street Routing:** We're going to integrate OpenRouteService to click to real roads and paths instead of just straight lines.
-* **Real Accounts:** Add proper user logins with Spring Security or Firebase.
-* **Push Notifications:** Actually send push alerts to mobile devices if a daily route gets too polluted.
+3. Open `http://localhost:5173` in your browser.

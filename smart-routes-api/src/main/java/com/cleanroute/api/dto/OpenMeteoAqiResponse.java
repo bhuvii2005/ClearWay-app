@@ -22,6 +22,7 @@ public class OpenMeteoAqiResponse {
         private List<Double> pm2_5;
         private List<Double> carbon_monoxide;
         private List<Double> nitrogen_dioxide;
+        private List<Double> ozone;
 
         public List<String> getTime() {
             return time;
@@ -69,6 +70,14 @@ public class OpenMeteoAqiResponse {
 
         public void setNitrogen_dioxide(List<Double> nitrogen_dioxide) {
             this.nitrogen_dioxide = nitrogen_dioxide;
+        }
+
+        public List<Double> getOzone() {
+            return ozone;
+        }
+
+        public void setOzone(List<Double> ozone) {
+            this.ozone = ozone;
         }
     }
 }
