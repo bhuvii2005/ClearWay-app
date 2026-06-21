@@ -2,6 +2,7 @@ package com.cleanroute.api.controller;
 
 import com.cleanroute.api.dto.CreateRouteRequest;
 import com.cleanroute.api.entity.Route;
+import com.cleanroute.api.dto.AlternativeRouteDto;
 import com.cleanroute.api.service.RouteService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,18 @@ public class RouteController {
 
     public RouteController(RouteService routeService) {
         this.routeService = routeService;
+    }
+
+    @PostMapping("/alternatives")
+    public ResponseEntity<?> computeAlternativeRoutes(@RequestBody CreateRouteRequest request) {
+        logger.info("Calculating alternatives for route: {}", request.getName());
+        try {
+            List<AlternativeRouteDto> alternatives = routeService.fetchAlternatives(request);
+            return ResponseEntity.ok(alternatives);
+        } catch (Exception e) {
+            logger.error("Error computing alternatives", e);
+            return ResponseEntity.badRequest().body("Failed to compute alternatives: " + e.getMessage());
+        }
     }
 
     @PostMapping

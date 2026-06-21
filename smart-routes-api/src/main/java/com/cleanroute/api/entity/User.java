@@ -29,6 +29,23 @@ public class User {
     @Column(name = "whatsapp_opt_in")
     private Boolean whatsappOptIn = false;
 
+    @Column(name = "password_hash")
+    private String passwordHash;
+
+    private String salt;
+
+    @Column(name = "avoid_pm25")
+    private Boolean avoidPm25 = false;
+
+    @Column(name = "avoid_ozone")
+    private Boolean avoidOzone = false;
+
+    @Column(name = "avoid_pm10")
+    private Boolean avoidPm10 = false;
+
+    @Column(name = "avoid_no2")
+    private Boolean avoidNo2 = false;
+
     @Column(name = "created_at", updatable = false)
     private ZonedDateTime createdAt;
 
@@ -118,5 +135,53 @@ public class User {
 
     public void setLastActive(ZonedDateTime lastActive) {
         this.lastActive = lastActive;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
+    }
+
+    public String getSalt() {
+        return salt;
+    }
+
+    public void setSalt(String salt) {
+        this.salt = salt;
+    }
+
+    public Boolean getAvoidPm25() {
+        return avoidPm25;
+    }
+
+    public void setAvoidPm25(Boolean avoidPm25) {
+        this.avoidPm25 = avoidPm25;
+    }
+
+    public Boolean getAvoidOzone() {
+        return avoidOzone;
+    }
+
+    public void setAvoidOzone(Boolean avoidOzone) {
+        this.avoidOzone = avoidOzone;
+    }
+
+    public Boolean getAvoidPm10() {
+        return avoidPm10;
+    }
+
+    public void setAvoidPm10(Boolean avoidPm10) {
+        this.avoidPm10 = avoidPm10;
+    }
+
+    public Boolean getAvoidNo2() {
+        return avoidNo2;
+    }
+
+    public void setAvoidNo2(Boolean avoidNo2) {
+        this.avoidNo2 = avoidNo2;
     }
 }

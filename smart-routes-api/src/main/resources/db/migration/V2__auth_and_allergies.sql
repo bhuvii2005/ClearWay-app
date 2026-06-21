@@ -1,0 +1,7 @@
+-- Add authentication and allergy preference columns to users
+ALTER TABLE users ADD COLUMN password_hash VARCHAR(255);
+ALTER TABLE users ADD COLUMN salt VARCHAR(255);
+ALTER TABLE users ADD COLUMN avoid_pm25 BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN avoid_ozone BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN avoid_pm10 BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN avoid_no2 BOOLEAN DEFAULT FALSE;
