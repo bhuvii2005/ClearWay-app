@@ -50,6 +50,7 @@ public class RouteService {
         this.geometryFactory = new GeometryFactory();
     }
 
+    @Transactional
     public Route createRoute(CreateRouteRequest request) {
         User user = userRepository.findById(request.getUserId())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -77,10 +78,12 @@ public class RouteService {
         return route;
     }
 
+    @Transactional(readOnly = true)
     public List<Route> getActiveRoutesForUser(UUID userId) {
         return routeRepository.findByUserIdAndIsActiveTrue(userId);
     }
 
+    @Transactional
     public void computeScoreForRoute(Route route) {
         try {
             User user = null;
@@ -97,10 +100,8 @@ public class RouteService {
             route.setLastPollutionScore(metrics.getPollutionScore());
             route.setLastCheckedAt(ZonedDateTime.now());
             
-            // Recalculate average (simplified for MVP)
-            Double avg = route.getAvgPollutionScore() == null ? 
-                    metrics.getPollutionScore() : 
-                    (route.getAvgPollutionScore() + metrics.getPollutionScore()) / 2;
+            // Recalculate average dynamically
+            Double avg = metricsRepository.findAveragePollutionScoreByRouteId(route.getId());
             route.setAvgPollutionScore(avg);
             
             routeRepository.save(route);
@@ -110,6 +111,11 @@ public class RouteService {
             
         } catch (Exception e) {
             logger.error("Error computing score for route {}", route.getId(), e);
+            if (route.getLastPollutionScore() == null) {
+                route.setLastPollutionScore(-1.0);
+                route.setLastCheckedAt(ZonedDateTime.now());
+                routeRepository.save(route);
+            }
         }
     }
 

@@ -34,11 +34,17 @@ public class PollutionScheduler {
         List<Route> routes = routeRepository.findByIsActiveTrue();
         
         int evaluated = 0;
+        int failed = 0;
         for (Route route : routes) {
-            routeService.computeScoreForRoute(route);
-            evaluated++;
+            try {
+                routeService.computeScoreForRoute(route);
+                evaluated++;
+            } catch (Exception e) {
+                logger.error("Failed to evaluate route {}: {}", route.getId(), e.getMessage());
+                failed++;
+            }
         }
         
-        logger.info("Completed evaluation of {} active routes.", evaluated);
+        logger.info("Completed evaluation: {} succeeded, {} failed.", evaluated, failed);
     }
 }

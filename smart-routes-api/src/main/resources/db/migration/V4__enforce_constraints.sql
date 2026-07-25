@@ -1,3 +1,6 @@
+-- Clean up users with no password (e.g. from DataInitializer) before enforcing constraint
+DELETE FROM users WHERE password_hash IS NULL;
+
 -- Update password_hash column constraint
 ALTER TABLE users ALTER COLUMN password_hash SET NOT NULL;
 

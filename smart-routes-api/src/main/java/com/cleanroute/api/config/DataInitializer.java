@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Configuration;
 import java.util.UUID;
 
 import org.springframework.context.annotation.Profile;
+import com.cleanroute.api.util.SecurityHelper;
 
 @Profile("dev")
 @Configuration
@@ -26,10 +27,11 @@ public class DataInitializer {
                         "SELECT COUNT(*) FROM users WHERE id = ?", Integer.class, UUID.fromString(MOCK_USER_ID));
                 
                 if (count == null || count == 0) {
+                    String defaultPasswordHash = SecurityHelper.hashPassword("demo123");
                     jdbcTemplate.update(
-                        "INSERT INTO users (id, name, email, phone, created_at, last_active, whatsapp_opt_in) " +
-                        "VALUES (?, 'Demo User', 'demo@cleanroute.com', '+1234567890', NOW(), NOW(), false)",
-                        UUID.fromString(MOCK_USER_ID)
+                        "INSERT INTO users (id, name, email, phone, password_hash, password_version, created_at, last_active, whatsapp_opt_in) " +
+                        "VALUES (?, 'Demo User', 'demo@cleanroute.com', '+1234567890', ?, 2, NOW(), NOW(), false)",
+                        UUID.fromString(MOCK_USER_ID), defaultPasswordHash
                     );
                     System.out.println("Initialized mock user for frontend testing via Native SQL: " + MOCK_USER_ID);
                 } else {

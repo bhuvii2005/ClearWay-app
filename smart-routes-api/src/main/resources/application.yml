@@ -15,18 +15,22 @@ spring:
         format_sql: true
     show-sql: true
   flyway:
+
     enabled: true
     baseline-on-migrate: true
+  cache:
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=900s
 
 server:
   port: 8080
 
 tomtom:
   api:
-    key: ${TOMTOM_API_KEY:REMOVED_TOMTOM_KEY}
+    key: ${TOMTOM_API_KEY}
 
 jwt:
-  secret: ${JWT_SECRET:REMOVED_JWT_SECRET}
+  secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 logging:

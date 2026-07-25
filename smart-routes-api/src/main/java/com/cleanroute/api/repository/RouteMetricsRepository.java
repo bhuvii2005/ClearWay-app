@@ -10,4 +10,7 @@ import java.util.UUID;
 @Repository
 public interface RouteMetricsRepository extends JpaRepository<RouteMetrics, UUID> {
     List<RouteMetrics> findByRouteIdOrderByTimestampDesc(UUID routeId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT AVG(m.pollutionScore) FROM RouteMetrics m WHERE m.route.id = :routeId")
+    Double findAveragePollutionScoreByRouteId(@org.springframework.data.repository.query.Param("routeId") UUID routeId);
 }

@@ -4,6 +4,7 @@ import com.cleanroute.api.dto.CreateRouteRequest;
 import com.cleanroute.api.dto.ErrorResponse;
 import com.cleanroute.api.entity.Route;
 import com.cleanroute.api.dto.AlternativeRouteDto;
+import com.cleanroute.api.dto.RouteDto;
 import com.cleanroute.api.service.RouteService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -63,8 +64,7 @@ public class RouteController {
 
         Route createdRoute = routeService.createRoute(request);
         logger.info("Successfully created route with ID: {}", createdRoute.getId());
-        return ResponseEntity.ok("Route Created successfully with ID: " + createdRoute.getId() + 
-                                 " | Initial Score: " + createdRoute.getLastPollutionScore());
+        return ResponseEntity.ok(new RouteDto(createdRoute));
     }
 
     @GetMapping("/user/{userId}")
@@ -76,11 +76,10 @@ public class RouteController {
 
         List<Route> routes = routeService.getActiveRoutesForUser(userId);
         
-        List<String> simplifiedResponses = routes.stream()
-                .map(r -> String.format("Route: %s | Score: %.2f | Checked: %s", 
-                                        r.getName(), r.getLastPollutionScore(), r.getLastCheckedAt()))
+        List<RouteDto> routeDtos = routes.stream()
+                .map(RouteDto::new)
                 .collect(Collectors.toList());
                 
-        return ResponseEntity.ok(simplifiedResponses);
+        return ResponseEntity.ok(routeDtos);
     }
 }

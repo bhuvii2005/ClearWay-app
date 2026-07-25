@@ -10,6 +10,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import org.springframework.cache.annotation.Cacheable;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 
 @Service
 public class OpenMeteoAqiClient {
@@ -19,11 +22,8 @@ public class OpenMeteoAqiClient {
     
     private final RestTemplate restTemplate;
 
-    public OpenMeteoAqiClient() {
-        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);
-        factory.setReadTimeout(5000);
-        this.restTemplate = new RestTemplate(factory);
+    public OpenMeteoAqiClient(RestTemplate restTemplate) {
+        this.restTemplate = restTemplate;
     }
 
     /**
@@ -37,6 +37,9 @@ public class OpenMeteoAqiClient {
     /**
      * Fetches detailed pollution data (AQI, PM2.5, PM10, CO, NO2, Ozone) for a given location.
      */
+    @Cacheable(value = "caffeine", key = "T(java.lang.Math).round(#latitude * 100) + ',' + T(java.lang.Math).round(#longitude * 100)")
+    @CircuitBreaker(name = "openMeteo", fallbackMethod = "getPollutionDataFallback")
+    @Retry(name = "openMeteo")
     public PollutionData getPollutionData(double latitude, double longitude) {
         double clampedLat = Math.max(-90.0, Math.min(90.0, latitude));
         double normalizedLon = ((longitude + 180) % 360 + 360) % 360 - 180;
@@ -48,8 +51,7 @@ public class OpenMeteoAqiClient {
                 .queryParam("timezone", "auto")
                 .toUriString();
 
-        try {
-            OpenMeteoAqiResponse response = restTemplate.getForObject(url, OpenMeteoAqiResponse.class);
+        OpenMeteoAqiResponse response = restTemplate.getForObject(url, OpenMeteoAqiResponse.class);
             
             if (response != null && response.getHourly() != null) {
                 int index = getCurrentHourIndex(response);
@@ -63,11 +65,12 @@ public class OpenMeteoAqiClient {
                 
                 return new PollutionData(aqi, pm25, pm10, no2, ozone, co);
             }
-        } catch (Exception e) {
-            logger.error("Failed to fetch pollution data for lat: {}, lon: {}", latitude, longitude, e);
-        }
-        
         return null;
+    }
+
+    public PollutionData getPollutionDataFallback(double latitude, double longitude, Throwable t) {
+        logger.warn("OpenMeteo API failed or circuit broken for lat: {}, lon: {}. Reason: {}", latitude, longitude, t.getMessage());
+        return new PollutionData(50.0, 0.0, 0.0, 0.0, 0.0, 0.0);
     }
 
     private double getValOrDefault(java.util.List<Double> list, int index, double defaultVal) {
