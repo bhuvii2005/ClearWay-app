@@ -1,10 +1,13 @@
 package com.cleanroute.api.controller;
 
 import com.cleanroute.api.dto.CreateRouteRequest;
+import com.cleanroute.api.dto.ErrorResponse;
 import com.cleanroute.api.entity.Route;
 import com.cleanroute.api.dto.AlternativeRouteDto;
 import com.cleanroute.api.service.RouteService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,9 +17,10 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/api/v1/routes")
-@CrossOrigin(origins = "*") // For React frontend testing
 public class RouteController {
 
     private static final Logger logger = LoggerFactory.getLogger(RouteController.class);
@@ -27,34 +31,49 @@ public class RouteController {
         this.routeService = routeService;
     }
 
-    @PostMapping("/alternatives")
-    public ResponseEntity<?> computeAlternativeRoutes(@RequestBody CreateRouteRequest request) {
-        logger.info("Calculating alternatives for route: {}", request.getName());
-        try {
-            List<AlternativeRouteDto> alternatives = routeService.fetchAlternatives(request);
-            return ResponseEntity.ok(alternatives);
-        } catch (Exception e) {
-            logger.error("Error computing alternatives", e);
-            return ResponseEntity.badRequest().body("Failed to compute alternatives: " + e.getMessage());
+    private UUID getAuthenticatedUserId() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof UUID) {
+            return (UUID) principal;
         }
+        return null;
+    }
+
+    @PostMapping("/alternatives")
+    public ResponseEntity<?> computeAlternativeRoutes(@Valid @RequestBody CreateRouteRequest request) {
+        logger.info("Calculating alternatives for route: {}", request.getName());
+        UUID currentUserId = getAuthenticatedUserId();
+        if (currentUserId != null) {
+            request.setUserId(currentUserId);
+        }
+
+        List<AlternativeRouteDto> alternatives = routeService.fetchAlternatives(request);
+        return ResponseEntity.ok(alternatives);
     }
 
     @PostMapping
-    public ResponseEntity<?> createRoute(@RequestBody CreateRouteRequest request) {
+    public ResponseEntity<?> createRoute(@Valid @RequestBody CreateRouteRequest request) {
         logger.info("Received request to create route: {}", request.getName());
-        try {
-            Route createdRoute = routeService.createRoute(request);
-            logger.info("Successfully created route with ID: {}", createdRoute.getId());
-            // In a real app we'd map this back to a detailed Response DTO to avoid Jackson spatial serialization issues
-            return ResponseEntity.ok("Route Created successfully with ID: " + createdRoute.getId() + 
-                                     " | Initial Score: " + createdRoute.getLastPollutionScore());
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Failed to create route: " + e.getMessage());
+        UUID currentUserId = getAuthenticatedUserId();
+        if (currentUserId != null) {
+            request.setUserId(currentUserId);
+        } else if (request.getUserId() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(401, "Unauthorized", "User authentication required"));
         }
+
+        Route createdRoute = routeService.createRoute(request);
+        logger.info("Successfully created route with ID: {}", createdRoute.getId());
+        return ResponseEntity.ok("Route Created successfully with ID: " + createdRoute.getId() + 
+                                 " | Initial Score: " + createdRoute.getLastPollutionScore());
     }
 
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getUserRoutes(@PathVariable UUID userId) {
+        UUID authUserId = getAuthenticatedUserId();
+        if (authUserId != null && !authUserId.equals(userId)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(403, "Forbidden", "Cannot view routes for another user"));
+        }
+
         List<Route> routes = routeService.getActiveRoutesForUser(userId);
         
         List<String> simplifiedResponses = routes.stream()

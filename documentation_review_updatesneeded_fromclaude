@@ -1,0 +1,135 @@
+# ClearWay Documentation Review
+
+A comparison of the three project documents against the actual codebase, plus recommended next features.
+
+---
+
+## 1. Issues Found in Software_Design_Document.md
+
+The design document is the most out-of-date file in the project.
+
+### Factual Errors / Missing Content
+
+| Issue | Current Doc Says | Reality in Code |
+|---|---|---|
+| **Auth system not mentioned** | User table only lists `id, name, email, fcm_token` | [User.java](file:///c:/Users/Bhuvan%20Chandran%20S/Downloads/ClearWay%20app/smart-routes-api/src/main/java/com/cleanroute/api/entity/User.java) has `passwordHash`, `salt`, and four `avoid_*` booleans |
+| **AuthController missing** | Only lists `RouteController` | [AuthController.java](file:///c:/Users/Bhuvan%20Chandran%20S/Downloads/ClearWay%20app/smart-routes-api/src/main/java/com/cleanroute/api/controller/AuthController.java) exists with `/api/v1/auth/signup`, `/login`, `/preferences` |
+| **TomTom not documented** | Says "Going to use OpenRouteService soon" | [TomTomRoutingClient.java](file:///c:/Users/Bhuvan%20Chandran%20S/Downloads/ClearWay%20app/smart-routes-api/src/main/java/com/cleanroute/api/service/integration/TomTomRoutingClient.java) is already implemented and active |
+| **NotificationEngineService missing** | Not mentioned at all | [NotificationEngineService.java](file:///c:/Users/Bhuvan%20Chandran%20S/Downloads/ClearWay%20app/smart-routes-api/src/main/java/com/cleanroute/api/service/NotificationEngineService.java) exists and is called from RouteService |
+| **Docker not mentioned** | No mention of containerization | The DB runs in Docker via [docker-compose.yml](file:///c:/Users/Bhuvan%20Chandran%20S/Downloads/ClearWay%20app/docker-compose.yml) on port 5434 |
+| **Flyway not mentioned** | No migration strategy discussed | Two Flyway migrations exist under `db/migration/` |
+| **Database schema incomplete** | Missing columns: `phone`, `preferred_channels`, `whatsapp_opt_in`, `password_hash`, `salt`, `avoid_*` flags, plus Routes is missing `distance_km`, `last_checked_at` | See [V1__init_schema.sql](file:///c:/Users/Bhuvan%20Chandran%20S/Downloads/ClearWay%20app/smart-routes-api/src/main/resources/db/migration/V1__init_schema.sql) and [V2__auth_and_allergies.sql](file:///c:/Users/Bhuvan%20Chandran%20S/Downloads/ClearWay%20app/smart-routes-api/src/main/resources/db/migration/V2__auth_and_allergies.sql) |
+| **Route_Metrics schema incomplete** | Missing `traffic_index` and `temperature` columns | Present in V1 migration |
+| **Flow description outdated** | Says "user clicks start and end point, backend saves as LineString" | Backend now queries TomTom for up to 3 road-snapped alternatives, scores each with per-pollutant data, and returns ranked results |
+
+### Structural Gaps
+
+- No mention of the `dto/`, `util/`, `config/`, or `repository/` packages.
+- No API endpoint table (the doc should list all REST endpoints with methods, paths, and payloads).
+- The "personal commentary" style ("really enjoying learning postgis") should be replaced with neutral technical language.
+
+---
+
+## 2. Issues Found in Software_Requirements_Specification.md
+
+### Requirements vs Implementation Status
+
+| Requirement | Status | Notes |
+|---|---|---|
+| FR1: Login | Implemented | [AuthController](file:///c:/Users/Bhuvan%20Chandran%20S/Downloads/ClearWay%20app/smart-routes-api/src/main/java/com/cleanroute/api/controller/AuthController.java) handles signup/login |
+| FR2: Checking routes | Implemented | One-off route checking works via TomTom alternatives |
+| FR3: Daily Checks / Scheduling | Partially | [PollutionScheduler](file:///c:/Users/Bhuvan%20Chandran%20S/Downloads/ClearWay%20app/smart-routes-api/src/main/java/com/cleanroute/api/scheduler) runs every 15 min, but user-configured time preferences are not yet implemented |
+| FR4: Warnings | Partially | NotificationEngineService has threshold logic, but no actual push delivery channel (FCM/email) is wired |
+| FR5: Route Finding | Implemented | TomTom provides up to 3 alternatives, ranked by pollution |
+| FR6: One-off trips | Implemented | Same as FR5 |
+| FR7: Custom Allergies | Implemented | Four pollutant toggles in User entity + weighted scoring |
+| NFR2: Map Accuracy | Done (differently) | Doc says "going to use OpenRouteService" but TomTom was used instead. Should update. |
+| NFR3: Reliability | Not implemented | No fallback handling when TomTom or Open-Meteo API is unavailable |
+| NFR5: Privacy | Partially | Passwords are hashed, but no HTTPS enforcement, no rate limiting, no token-based auth (sessions) |
+
+### Missing Requirements
+
+The SRS should add requirements for features that are already built but not documented:
+- **FR8: Allergy Preference Management** -- Users can update their pollutant sensitivities after registration.
+- **FR9: Alternative Route Comparison** -- System must present multiple routes ranked by pollution exposure.
+
+---
+
+## 3. Issues Found in README.md
+
+The README is the most accurate document but still has gaps.
+
+| Issue | Details |
+|---|---|
+| **No API reference section** | Should list available endpoints: `POST /api/v1/auth/signup`, `POST /api/v1/auth/login`, `POST /api/v1/auth/preferences`, `POST /api/v1/routes`, `POST /api/v1/routes/alternatives` |
+| **No environment variables section** | TomTom API key, Open-Meteo base URL, and DB credentials are config values that should be documented |
+| **No `.env` / config template** | New contributors would not know what keys to set |
+| **Missing license section** | No license specified |
+| **Missing contributing guidelines** | No guidance for contributors |
+
+---
+
+## 4. Recommended Document Updates
+
+> [!IMPORTANT]
+> These are changes to bring existing documentation in line with what is already built. No new code needed.
+
+### Software_Design_Document.md
+1. Add `AuthController` and its three endpoints to the App Structure section.
+2. Add `TomTomRoutingClient` and `NotificationEngineService` to the service list.
+3. Replace the "Going to use OpenRouteService" note with "Uses TomTom Routing API for road-snapped alternatives."
+4. Update the Database Setup section with the full schema including all columns from both migrations.
+5. Add a section on Docker infrastructure.
+6. Add a section on Flyway migrations.
+7. Rewrite the Flow section to reflect the current TomTom-based alternative routing flow.
+8. Remove personal commentary ("really enjoying learning postgis").
+
+### Software_Requirements_Specification.md
+1. Update NFR2 to say TomTom instead of OpenRouteService.
+2. Add FR8 (Allergy Preference Management) and FR9 (Alternative Route Comparison).
+3. Add a "Status" column to track which requirements are implemented.
+
+### README.md
+1. Add an API Reference section listing all endpoints.
+2. Add a Configuration / Environment Variables section.
+3. Add a License section.
+
+---
+
+## 5. Suggested New Features (Priority Ordered)
+
+These are features that would meaningfully improve the project beyond the current MVP.
+
+### High Priority
+
+| Feature | Description | Effort |
+|---|---|---|
+| **JWT Token Authentication** | Replace the current stateless login (returns user object) with proper JWT tokens. Every API call should send `Authorization: Bearer <token>`. This is the biggest security gap. | Medium |
+| **API Error Fallback** | If TomTom or Open-Meteo API is unreachable, return cached/last-known data instead of a 500 error. Addresses NFR3. | Low |
+| **Input Validation and Rate Limiting** | Add `@Valid` annotations on DTOs, proper error response DTOs, and Spring Security rate limiting. | Low |
+
+### Medium Priority
+
+| Feature | Description | Effort |
+|---|---|---|
+| **Route History Dashboard** | Frontend page showing a user's saved routes with historical pollution trends (line chart over time from `route_metrics`). The data is already being collected by PollutionScheduler. | Medium |
+| **Password Reset Flow** | Email-based password reset. Currently there is no recovery mechanism. | Medium |
+| **Full Dockerization** | Add the Spring Boot backend and React frontend as containers in `docker-compose.yml` alongside the DB. This would make the entire app one `docker compose up` command. | Medium |
+
+### Low Priority (Nice-to-Have)
+
+| Feature | Description | Effort |
+|---|---|---|
+| **Push Notification Delivery** | Wire up the existing FCM token field to actually send Firebase push notifications when pollution spikes. | Medium |
+| **Dark Mode Toggle** | The UI currently has a fixed theme. A dark/light toggle would improve UX. | Low |
+| **Export Routes to GPX/KML** | Allow users to download their route as a GPX file for use in fitness apps. | Low |
+
+---
+
+## Summary
+
+The codebase has evolved significantly beyond what the documentation describes. The **Design Document is the most outdated** -- it's missing the auth system, TomTom integration, Docker setup, and Flyway migrations entirely. The **SRS needs minor updates** for accuracy. The **README is mostly current** but lacks an API reference and configuration guide.
+
+For new features, **JWT authentication** is the highest-impact addition since the current auth returns raw user data with no session management, which is a security concern for any real deployment.
+
+Would you like me to proceed with updating the documentation, or would you prefer to start on one of the suggested features?

@@ -62,7 +62,7 @@ The backend relies on the following environment variables. In a production envir
 
 - `SPRING_DATASOURCE_URL`: JDBC URL for PostgreSQL (default: `jdbc:postgresql://localhost:5434/cleanroute_db`)
 - `SPRING_DATASOURCE_USERNAME`: Database user (default: `postgres`)
-- `SPRING_DATASOURCE_PASSWORD`: Database password (default: `REMOVED_DB_PASSWORD`)
+- `SPRING_DATASOURCE_PASSWORD`: Database password (default: `postgres` or set via environment variable)
 - `TOMTOM_API_KEY`: API Key for the TomTom Routing API. A hardcoded fallback is currently used if not provided.
 
 ## API Reference

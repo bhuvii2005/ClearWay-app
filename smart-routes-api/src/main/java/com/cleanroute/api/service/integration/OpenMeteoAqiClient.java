@@ -39,8 +39,7 @@ public class OpenMeteoAqiClient {
      */
     public PollutionData getPollutionData(double latitude, double longitude) {
         double clampedLat = Math.max(-90.0, Math.min(90.0, latitude));
-        double lon = (longitude - 180) % 360;
-        double normalizedLon = (lon > 0) ? (lon - 180) : (lon + 180);
+        double normalizedLon = ((longitude + 180) % 360 + 360) % 360 - 180;
 
         String url = UriComponentsBuilder.fromUriString(OPEN_METEO_URL)
                 .queryParam("latitude", clampedLat)

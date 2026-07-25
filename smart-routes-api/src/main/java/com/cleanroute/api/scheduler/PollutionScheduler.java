@@ -31,15 +31,12 @@ public class PollutionScheduler {
     public void evaluateActiveRoutes() {
         logger.info("Starting scheduled evaluation of active routes...");
         
-        // In reality, this should be paginated/batched, but since this is MVP we fetch all.
-        List<Route> routes = routeRepository.findAll();
+        List<Route> routes = routeRepository.findByIsActiveTrue();
         
         int evaluated = 0;
         for (Route route : routes) {
-            if (Boolean.TRUE.equals(route.getIsActive())) {
-                routeService.computeScoreForRoute(route);
-                evaluated++;
-            }
+            routeService.computeScoreForRoute(route);
+            evaluated++;
         }
         
         logger.info("Completed evaluation of {} active routes.", evaluated);

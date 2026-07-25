@@ -34,6 +34,9 @@ public class User {
 
     private String salt;
 
+    @Column(name = "password_version")
+    private Integer passwordVersion = 2;
+
     @Column(name = "avoid_pm25")
     private Boolean avoidPm25 = false;
 
@@ -151,6 +154,14 @@ public class User {
 
     public void setSalt(String salt) {
         this.salt = salt;
+    }
+
+    public Integer getPasswordVersion() {
+        return passwordVersion;
+    }
+
+    public void setPasswordVersion(Integer passwordVersion) {
+        this.passwordVersion = passwordVersion;
     }
 
     public Boolean getAvoidPm25() {

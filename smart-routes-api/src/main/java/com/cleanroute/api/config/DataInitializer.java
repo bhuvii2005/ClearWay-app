@@ -9,6 +9,9 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.UUID;
 
+import org.springframework.context.annotation.Profile;
+
+@Profile("dev")
 @Configuration
 public class DataInitializer {
 

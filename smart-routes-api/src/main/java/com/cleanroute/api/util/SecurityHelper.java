@@ -1,45 +1,44 @@
 package com.cleanroute.api.util;
 
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.util.Base64;
 
 public class SecurityHelper {
 
-    private static final SecureRandom sr = new SecureRandom();
+    private static final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder(12);
 
     /**
-     * Generates a secure random salt encoded in Base64.
+     * Hashes password using BCrypt.
      */
-    public static String generateSalt() {
-        byte[] salt = new byte[16];
-        sr.nextBytes(salt);
-        return Base64.getEncoder().encodeToString(salt);
+    public static String hashPassword(String password) {
+        return bcrypt.encode(password);
     }
 
     /**
-     * Hashes the password with the salt using SHA-256.
+     * Verifies raw password against BCrypt hash.
      */
-    public static String hashPassword(String password, String salt) {
+    public static boolean verifyBcryptPassword(String password, String hash) {
+        if (hash == null) return false;
+        return bcrypt.matches(password, hash);
+    }
+
+    /**
+     * Legacy SHA-256 verification for version 1 passwords.
+     */
+    public static boolean verifySha256Password(String password, String salt, String hash) {
+        if (salt == null || hash == null) {
+            return false;
+        }
         try {
             MessageDigest md = MessageDigest.getInstance("SHA-256");
             md.update(Base64.getDecoder().decode(salt));
             byte[] hashedBytes = md.digest(password.getBytes());
-            return Base64.getEncoder().encodeToString(hashedBytes);
+            String computedHash = Base64.getEncoder().encodeToString(hashedBytes);
+            return MessageDigest.isEqual(computedHash.getBytes(), hash.getBytes());
         } catch (NoSuchAlgorithmException | IllegalArgumentException e) {
-            throw new RuntimeException("Error hashing password: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Verifies if the raw password matches the stored hash and salt.
-     */
-    public static boolean verifyPassword(String password, String salt, String hash) {
-        if (salt == null || hash == null) {
             return false;
         }
-        String computedHash = hashPassword(password, salt);
-        return computedHash.equals(hash);
     }
 }

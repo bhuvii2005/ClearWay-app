@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Polyline, useMapEvents, Popup } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import axios from 'axios';
+import api from './api';
 
 // Fix for default Leaflet icons in React
 delete L.Icon.Default.prototype._getIconUrl;
@@ -17,8 +17,11 @@ function MapComponent() {
   const [alternativeRoutes, setAlternativeRoutes] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Authentication State
-  const [user, setUser] = useState(null);
+  // Authentication State with localStorage persistence
+  const [user, setUser] = useState(() => {
+    const savedUser = localStorage.getItem('authUser');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
   const [authMode, setAuthMode] = useState('login'); // 'login' or 'signup'
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
@@ -27,9 +30,6 @@ function MapComponent() {
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
   const [preferencesSaved, setPreferencesSaved] = useState(false);
-
-  // Example User ID (Fallback placeholder if not logged in)
-  const MOCK_USER_ID = "00000000-0000-0000-0000-000000000001"; 
 
   const MapEvents = () => {
     useMapEvents({
@@ -46,19 +46,17 @@ function MapComponent() {
     if (waypoints.length < 2) return;
     setLoading(true);
     try {
-      // Hit the TomTom alternatives endpoint
-      const response = await axios.post('http://localhost:8080/api/v1/routes/alternatives', {
-        userId: user ? user.id : MOCK_USER_ID,
+      const response = await api.post('/api/v1/routes/alternatives', {
+        userId: user ? user.id : null,
         name: "My Custom Route",
         type: "walking",
-        pathCoordinates: waypoints.map(wp => [wp[1], wp[0]]) // Lon, Lat for PostGIS
+        pathCoordinates: waypoints.map(wp => [wp[1], wp[0]])
       });
 
-      // Save the array of routes to draw them
       setAlternativeRoutes(response.data);
     } catch (error) {
       console.error("Error creating route", error);
-      alert("Error: Backend must be running on port 8080 and configured properly!");
+      alert("Error calculating routes. Make sure you are logged in!");
     } finally {
       setLoading(false);
     }
@@ -68,7 +66,7 @@ function MapComponent() {
     if (waypoints.length < 2) return;
     setLoading(true);
     try {
-      const response = await axios.post('http://localhost:8080/api/v1/routes/alternatives', {
+      const response = await api.post('/api/v1/routes/alternatives', {
         userId: userId,
         name: "My Custom Route",
         type: "walking",
@@ -93,21 +91,26 @@ function MapComponent() {
     setAuthLoading(true);
     setAuthError("");
     try {
-      const response = await axios.post('http://localhost:8080/api/v1/auth/login', {
+      const response = await api.post('/api/v1/auth/login', {
         email: authEmail,
         password: authPassword
       });
-      setUser(response.data);
+      
+      const { token, user: userData } = response.data;
+      if (token) {
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('authUser', JSON.stringify(userData));
+      }
+      setUser(userData);
       setAuthPassword("");
       setAuthError("");
       
-      // Auto-recalculate if user already plotted path before logging in
       if (waypoints.length >= 2) {
-        calculateRouteWithUser(response.data.id);
+        calculateRouteWithUser(userData.id);
       }
     } catch (error) {
       console.error("Login failed", error);
-      setAuthError(error.response?.data || "Invalid email or password");
+      setAuthError(error.response?.data?.message || error.response?.data || "Invalid email or password");
     } finally {
       setAuthLoading(false);
     }
@@ -118,30 +121,38 @@ function MapComponent() {
     setAuthLoading(true);
     setAuthError("");
     try {
-      const response = await axios.post('http://localhost:8080/api/v1/auth/signup', {
+      const response = await api.post('/api/v1/auth/signup', {
         name: authName,
         email: authEmail,
         password: authPassword,
         phone: authPhone
       });
-      setUser(response.data);
+      
+      const { token, user: userData } = response.data;
+      if (token) {
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('authUser', JSON.stringify(userData));
+      }
+      setUser(userData);
       setAuthPassword("");
       setAuthName("");
       setAuthPhone("");
       setAuthError("");
 
       if (waypoints.length >= 2) {
-        calculateRouteWithUser(response.data.id);
+        calculateRouteWithUser(userData.id);
       }
     } catch (error) {
       console.error("Signup failed", error);
-      setAuthError(error.response?.data || "Registration failed. Try again.");
+      setAuthError(error.response?.data?.message || error.response?.data || "Registration failed. Try again.");
     } finally {
       setAuthLoading(false);
     }
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('authUser');
     setUser(null);
     setAuthEmail('');
     setAlternativeRoutes([]);
@@ -158,14 +169,15 @@ function MapComponent() {
     };
     
     try {
-      const response = await axios.post('http://localhost:8080/api/v1/auth/preferences', updatedPreferences);
-      setUser(response.data);
+      const response = await api.post('/api/v1/auth/preferences', updatedPreferences);
+      const updatedUser = response.data;
+      localStorage.setItem('authUser', JSON.stringify(updatedUser));
+      setUser(updatedUser);
       setPreferencesSaved(true);
       setTimeout(() => setPreferencesSaved(false), 2000);
       
-      // Re-calculate the route on-the-fly to show the immediate effect of the preference!
       if (waypoints.length >= 2) {
-        calculateRouteWithUser(response.data.id);
+        calculateRouteWithUser(updatedUser.id);
       }
     } catch (error) {
       console.error("Failed to update preferences", error);

@@ -1,15 +1,22 @@
 package com.cleanroute.api.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
 import java.util.UUID;
 import java.util.List;
 
 public class CreateRouteRequest {
     
     private UUID userId;
+
+    @NotBlank(message = "Route name is required")
     private String name;
-    private String type;
+
+    private String type = "walking";
     
-    // Simple 2D array representing path segments [[lon1, lat1], [lon2, lat2]]
+    @NotEmpty(message = "Path coordinates are required")
+    @Size(min = 2, message = "Route must contain at least a start and end point")
     private List<List<Double>> pathCoordinates;
 
     public UUID getUserId() {

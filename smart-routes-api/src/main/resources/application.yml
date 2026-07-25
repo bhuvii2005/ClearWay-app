@@ -2,9 +2,9 @@ spring:
   application:
     name: smart-routes-api
   datasource:
-    url: jdbc:postgresql://localhost:5434/cleanroute_db
-    username: postgres
-    password: REMOVED_DB_PASSWORD
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5434/cleanroute_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
@@ -23,7 +23,11 @@ server:
 
 tomtom:
   api:
-    key: REMOVED_TOMTOM_KEY
+    key: ${TOMTOM_API_KEY:REMOVED_TOMTOM_KEY}
+
+jwt:
+  secret: ${JWT_SECRET:REMOVED_JWT_SECRET}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 logging:
   level:

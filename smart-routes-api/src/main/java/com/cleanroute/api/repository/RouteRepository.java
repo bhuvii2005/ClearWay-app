@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface RouteRepository extends JpaRepository<Route, UUID> {
     List<Route> findByUserIdAndIsActiveTrue(UUID userId);
+    List<Route> findByIsActiveTrue();
 }
