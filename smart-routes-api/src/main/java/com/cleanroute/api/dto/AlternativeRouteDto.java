@@ -19,4 +19,9 @@ public class AlternativeRouteDto {
 
     public int getTravelTimeSeconds() { return travelTimeSeconds; }
     public void setTravelTimeSeconds(int travelTimeSeconds) { this.travelTimeSeconds = travelTimeSeconds; }
+
+    private PollutionData pollutionData;
+
+    public PollutionData getPollutionData() { return pollutionData; }
+    public void setPollutionData(PollutionData pollutionData) { this.pollutionData = pollutionData; }
 }

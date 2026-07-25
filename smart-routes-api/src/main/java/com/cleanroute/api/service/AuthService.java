@@ -94,4 +94,45 @@ public class AuthService {
         logger.info("Successfully updated preferences for user: {}", updatedUser.getEmail());
         return new UserDto(updatedUser);
     }
+
+    @Transactional
+    public UserDto updateProfile(UUID userId, ProfileUpdateRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        if (request.getName() != null) user.setName(request.getName());
+        if (request.getPhone() != null) user.setPhone(request.getPhone());
+        if (request.getWhatsappOptIn() != null) user.setWhatsappOptIn(request.getWhatsappOptIn());
+
+        User updatedUser = userRepository.save(user);
+        return new UserDto(updatedUser);
+    }
+
+    @Transactional
+    public void changePassword(UUID userId, ChangePasswordRequest request) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+
+        boolean matches;
+        if (user.getPasswordVersion() != null && user.getPasswordVersion() == 1) {
+            matches = SecurityHelper.verifySha256Password(request.getCurrentPassword(), user.getPasswordSalt(), user.getPasswordHash());
+        } else {
+            matches = SecurityHelper.verifyBcryptPassword(request.getCurrentPassword(), user.getPasswordHash());
+        }
+
+        if (!matches) {
+            throw new IllegalArgumentException("Current password is incorrect");
+        }
+
+        user.setPasswordHash(SecurityHelper.hashPassword(request.getNewPassword()));
+        user.setPasswordVersion(2);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteAccount(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        userRepository.delete(user);
+    }
 }

@@ -4,6 +4,10 @@ import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import api from './api';
 
+import AuthPanel from './components/AuthPanel';
+import PreferencesPanel from './components/PreferencesPanel';
+import RoutePanel from './components/RoutePanel';
+
 // Fix for default Leaflet icons in React
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -253,237 +257,33 @@ function MapComponent() {
           {/* User Session & Preference Panel */}
           <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-600/30">
             {user ? (
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-[10px] text-slate-400">Logged in as</p>
-                    <p className="font-bold text-emerald-400 text-sm">{user.name}</p>
-                  </div>
-                  <button 
-                    onClick={handleLogout}
-                    className="py-1 px-3 text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg border border-slate-650 transition-colors"
-                  >
-                    Logout
-                  </button>
-                </div>
-
-                {/* Preferences Section */}
-                <div className="border-t border-slate-700/50 pt-3.5 space-y-2.5">
-                  <h3 className="text-xs font-bold text-cyan-400 uppercase tracking-wider">Allergy Toggles</h3>
-                  <p className="text-[11px] text-slate-400 leading-snug">
-                    Penalizes route alternatives containing high amounts of selected triggers.
-                  </p>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <label className="flex items-center gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-700/30 cursor-pointer hover:bg-slate-900/80 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={user.avoidPm25} 
-                        onChange={(e) => handlePreferenceChange('avoidPm25', e.target.checked)}
-                        className="rounded border-slate-650 text-emerald-500 focus:ring-emerald-500 bg-slate-850 h-4 w-4" 
-                      />
-                      <span>PM2.5</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-700/30 cursor-pointer hover:bg-slate-900/80 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={user.avoidOzone} 
-                        onChange={(e) => handlePreferenceChange('avoidOzone', e.target.checked)}
-                        className="rounded border-slate-650 text-emerald-500 focus:ring-emerald-500 bg-slate-850 h-4 w-4" 
-                      />
-                      <span>Ozone</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-700/30 cursor-pointer hover:bg-slate-900/80 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={user.avoidPm10} 
-                        onChange={(e) => handlePreferenceChange('avoidPm10', e.target.checked)}
-                        className="rounded border-slate-650 text-emerald-500 focus:ring-emerald-500 bg-slate-850 h-4 w-4" 
-                      />
-                      <span>PM10</span>
-                    </label>
-
-                    <label className="flex items-center gap-2 bg-slate-900/50 p-2 rounded-lg border border-slate-700/30 cursor-pointer hover:bg-slate-900/80 transition-colors">
-                      <input 
-                        type="checkbox" 
-                        checked={user.avoidNo2} 
-                        onChange={(e) => handlePreferenceChange('avoidNo2', e.target.checked)}
-                        className="rounded border-slate-650 text-emerald-500 focus:ring-emerald-500 bg-slate-850 h-4 w-4" 
-                      />
-                      <span>NO₂</span>
-                    </label>
-                  </div>
-                  
-                  {preferencesSaved && (
-                    <div className="text-[10px] text-emerald-400 font-bold text-center animate-pulse pt-1">
-                      ✓ Preferences updated & route prioritized
-                    </div>
-                  )}
-                </div>
-              </div>
+              <PreferencesPanel 
+                user={user} 
+                handleLogout={handleLogout} 
+                handlePreferenceChange={handlePreferenceChange} 
+                preferencesSaved={preferencesSaved} 
+              />
             ) : (
-              <div>
-                <div className="flex border-b border-slate-700 mb-3 text-xs font-bold uppercase">
-                  <button 
-                    onClick={() => { setAuthMode('login'); setAuthError(''); }}
-                    className={`flex-1 pb-2 border-b-2 text-center transition-all ${authMode === 'login' ? 'border-emerald-400 text-emerald-400' : 'border-transparent text-slate-450'}`}
-                  >
-                    Login
-                  </button>
-                  <button 
-                    onClick={() => { setAuthMode('signup'); setAuthError(''); }}
-                    className={`flex-1 pb-2 border-b-2 text-center transition-all ${authMode === 'signup' ? 'border-emerald-400 text-emerald-400' : 'border-transparent text-slate-450'}`}
-                  >
-                    Register
-                  </button>
-                </div>
-
-                <form onSubmit={authMode === 'login' ? handleLogin : handleSignup} className="space-y-2.5">
-                  {authMode === 'signup' && (
-                    <>
-                      <input 
-                        type="text" 
-                        placeholder="Full Name" 
-                        required
-                        value={authName}
-                        onChange={(e) => setAuthName(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-                      />
-                      <input 
-                        type="text" 
-                        placeholder="Phone Number" 
-                        value={authPhone}
-                        onChange={(e) => setAuthPhone(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-                      />
-                    </>
-                  )}
-                  
-                  <input 
-                    type="email" 
-                    placeholder="Email Address" 
-                    required
-                    value={authEmail}
-                    onChange={(e) => setAuthEmail(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-                  />
-                  <input 
-                    type="password" 
-                    placeholder="Password" 
-                    required
-                    value={authPassword}
-                    onChange={(e) => setAuthPassword(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-                  />
-
-                  {authError && (
-                    <p className="text-[10px] text-rose-400 font-bold bg-rose-955/20 p-2 rounded border border-rose-900/30">
-                      {authError}
-                    </p>
-                  )}
-
-                  <button 
-                    type="submit" 
-                    disabled={authLoading}
-                    className="w-full py-2 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 rounded-lg text-xs font-bold text-white transition-all shadow hover:shadow-cyan-500/20 active:scale-[0.98] disabled:opacity-50"
-                  >
-                    {authLoading ? 'Authenticating...' : (authMode === 'login' ? 'Login' : 'Create Account')}
-                  </button>
-                </form>
-              </div>
+              <AuthPanel 
+                authMode={authMode} setAuthMode={setAuthMode}
+                authName={authName} setAuthName={setAuthName}
+                authEmail={authEmail} setAuthEmail={setAuthEmail}
+                authPassword={authPassword} setAuthPassword={setAuthPassword}
+                authPhone={authPhone} setAuthPhone={setAuthPhone}
+                authError={authError} setAuthError={setAuthError}
+                authLoading={authLoading}
+                handleLogin={handleLogin} handleSignup={handleSignup}
+              />
             )}
           </div>
 
-          {/* Plan Route Panel */}
-          <div className="bg-slate-800/60 rounded-xl p-4 border border-slate-600/30">
-            <h2 className="text-md font-semibold text-emerald-300 mb-3 flex items-center gap-2">
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              Plan Your Route
-            </h2>
-            
-            <ul className="text-xs text-slate-300 space-y-2.5 mb-4">
-              <li className="flex items-center gap-3 bg-slate-900/50 p-2.5 rounded-lg border border-slate-700/50 transition-colors">
-                <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-inner ${waypoints.length >= 1 ? 'bg-emerald-500 text-slate-900 shadow-emerald-400/50' : 'bg-slate-700 text-slate-400'}`}>1</span>
-                <div>
-                  <p className="font-medium text-slate-200">Set Origin</p>
-                  <p className="text-[10px] text-slate-400">Click the map to start</p>
-                </div>
-              </li>
-              <li className="flex items-center gap-3 bg-slate-900/50 p-2.5 rounded-lg border border-slate-700/50 transition-colors">
-                <span className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold shadow-inner ${waypoints.length >= 2 ? 'bg-cyan-500 text-slate-900 shadow-cyan-400/50' : 'bg-slate-700 text-slate-400'}`}>2</span>
-                <div>
-                  <p className="font-medium text-slate-200">Set Destination</p>
-                  <p className="text-[10px] text-slate-400">Click the map to end</p>
-                </div>
-              </li>
-            </ul>
-
-            <div className="flex flex-col gap-2">
-              <button 
-                onClick={calculateRoute} 
-                disabled={waypoints.length < 2 || loading}
-                className={`w-full py-3 px-4 rounded-xl font-bold transition-all duration-300 shadow-lg flex items-center justify-center gap-2 text-sm
-                  ${waypoints.length < 2 || loading 
-                    ? 'bg-slate-800 cursor-not-allowed text-slate-500 shadow-none border border-slate-750' 
-                    : 'bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white hover:shadow-cyan-500/25 active:scale-[0.98]'
-                  }`}
-              >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Analyzing Air Quality...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                    Calculate Exposure Score
-                  </>
-                )}
-              </button>
-              
-              <button 
-                onClick={clearRoute}
-                className="w-full py-2.5 px-4 rounded-xl font-semibold bg-transparent hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors border border-slate-700 hover:border-slate-650"
-              >
-                Reset Map
-              </button>
-            </div>
-          </div>
-
-          {/* Route Alternatives Score Result Box */}
-          {alternativeRoutes.length > 0 && (
-            <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700 mt-1 space-y-3 animate-in slide-in-from-bottom-4 fade-in duration-500">
-              <h3 className="text-emerald-400 font-bold flex items-center gap-2 text-sm">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                Route Alternatives
-              </h3>
-              <div className="space-y-2">
-                {alternativeRoutes.map((route, idx) => (
-                  <div key={idx} className={`p-3 rounded-lg flex justify-between items-center border ${idx === 0 ? 'bg-emerald-900/40 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.15)]' : 'bg-slate-900/50 border-slate-750'}`}>
-                    <div>
-                      <p className={`font-bold text-xs ${idx === 0 ? 'text-emerald-400' : 'text-slate-300'}`}>
-                        {idx === 0 ? 'Healthiest Route' : `Alternative ${idx}`}
-                      </p>
-                      <p className="text-[10px] text-slate-450">
-                        {Math.round(route.distanceMeters / 1000 * 10) / 10} km • {Math.round(route.travelTimeSeconds / 60)} mins
-                      </p>
-                    </div>
-                    <div className="text-right flex flex-col items-end">
-                      <p className={`text-xl font-black ${idx === 0 ? 'text-emerald-400' : 'text-slate-400'}`}>
-                        {Math.round(route.pollutionScore)}
-                      </p>
-                      <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">AQI</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <RoutePanel 
+            waypoints={waypoints}
+            loading={loading}
+            calculateRoute={calculateRoute}
+            clearRoute={clearRoute}
+            alternativeRoutes={alternativeRoutes}
+          />
 
         </div>
       </div>

@@ -52,4 +52,38 @@ public class AuthController {
         UserDto updatedUser = authService.updatePreferences(userId, request);
         return ResponseEntity.ok(updatedUser);
     }
+
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(@Valid @RequestBody ProfileUpdateRequest request) {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!(principal instanceof UUID)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(401, "Unauthorized", "Authentication required"));
+        }
+        UserDto updatedUser = authService.updateProfile((UUID) principal, request);
+        return ResponseEntity.ok(updatedUser);
+    }
+
+    @PostMapping("/password")
+    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!(principal instanceof UUID)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(401, "Unauthorized", "Authentication required"));
+        }
+        try {
+            authService.changePassword((UUID) principal, request);
+            return ResponseEntity.ok().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new ErrorResponse(400, "Bad Request", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/account")
+    public ResponseEntity<?> deleteAccount() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (!(principal instanceof UUID)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(401, "Unauthorized", "Authentication required"));
+        }
+        authService.deleteAccount((UUID) principal);
+        return ResponseEntity.ok().build();
+    }
 }

@@ -17,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.cleanroute.api.dto.AlternativeRouteDto;
 import com.cleanroute.api.dto.TomTomRouteResponse;
 import com.cleanroute.api.service.integration.TomTomRoutingClient;
+import com.cleanroute.api.service.integration.OpenMeteoAqiClient;
+import com.cleanroute.api.dto.PollutionData;
 
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -33,6 +35,7 @@ public class RouteService {
     private final PollutionEngineService pollutionEngineService;
     private final NotificationEngineService notificationEngineService;
     private final TomTomRoutingClient tomtomClient;
+    private final OpenMeteoAqiClient openMeteoClient;
     private final GeometryFactory geometryFactory;
 
     public RouteService(RouteRepository routeRepository,
@@ -40,13 +43,15 @@ public class RouteService {
                         RouteMetricsRepository metricsRepository,
                         PollutionEngineService pollutionEngineService,
                         NotificationEngineService notificationEngineService,
-                        TomTomRoutingClient tomtomClient) {
+                        TomTomRoutingClient tomtomClient,
+                        OpenMeteoAqiClient openMeteoClient) {
         this.routeRepository = routeRepository;
         this.userRepository = userRepository;
         this.metricsRepository = metricsRepository;
         this.pollutionEngineService = pollutionEngineService;
         this.notificationEngineService = notificationEngineService;
         this.tomtomClient = tomtomClient;
+        this.openMeteoClient = openMeteoClient;
         this.geometryFactory = new GeometryFactory();
     }
 
@@ -164,6 +169,14 @@ public class RouteService {
             dto.setPathCoordinates(rawCoords);
             dto.setPollutionScore(metrics.getPollutionScore());
             
+            // Fetch raw breakdown for the midpoint of the route as a representative sample
+            if (!coords.isEmpty()) {
+                int midIndex = coords.size() / 2;
+                Coordinate midCoord = coords.get(midIndex);
+                PollutionData rawData = openMeteoClient.getPollutionData(midCoord.y, midCoord.x);
+                dto.setPollutionData(rawData);
+            }
+            
             if (ttRoute.getSummary() != null) {
                 dto.setDistanceMeters(ttRoute.getSummary().getLengthInMeters());
                 dto.setTravelTimeSeconds(ttRoute.getSummary().getTravelTimeInSeconds());
@@ -176,5 +189,17 @@ public class RouteService {
         alternatives.sort(java.util.Comparator.comparingDouble(AlternativeRouteDto::getPollutionScore));
         
         return alternatives;
+    }
+
+    @Transactional
+    public void deleteRoute(UUID routeId, UUID userId) {
+        Route route = routeRepository.findById(routeId)
+                .orElseThrow(() -> new IllegalArgumentException("Route not found"));
+                
+        if (route.getUser() == null || !route.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("Forbidden: Cannot delete this route");
+        }
+        
+        routeRepository.delete(route);
     }
 }
