@@ -2,42 +2,38 @@ package com.cleanroute.api.service.integration;
 
 import com.cleanroute.api.dto.OpenMeteoAqiResponse;
 import com.cleanroute.api.dto.PollutionData;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import org.springframework.cache.annotation.Cacheable;
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
-
+/**
+ * Client for the free Open-Meteo Air Quality API (no API key required).
+ *
+ * Results are cached per ~1 km grid cell (coordinates rounded to 0.01 degrees) for 15 minutes,
+ * which matches Open-Meteo's update frequency and keeps request volume low.
+ * Returns null when the service is unavailable; callers decide how to degrade.
+ */
 @Service
 public class OpenMeteoAqiClient {
 
     private static final Logger logger = LoggerFactory.getLogger(OpenMeteoAqiClient.class);
     private static final String OPEN_METEO_URL = "https://air-quality-api.open-meteo.com/v1/air-quality";
-    
+    private static final String CURRENT_FIELDS = "european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone";
+
     private final RestTemplate restTemplate;
 
     public OpenMeteoAqiClient(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 
-    /**
-     * Fetches current AQI for a given latitude and longitude.
-     */
-    public Double getCurrentAqi(double latitude, double longitude) {
-        PollutionData data = getPollutionData(latitude, longitude);
-        return data != null ? data.getAqi() : null;
-    }
-
-    /**
-     * Fetches detailed pollution data (AQI, PM2.5, PM10, CO, NO2, Ozone) for a given location.
-     */
-    @Cacheable(value = "caffeine", key = "T(java.lang.Math).round(#latitude * 100) + ',' + T(java.lang.Math).round(#longitude * 100)")
+    @Cacheable(value = "aqi",
+            key = "T(java.lang.Math).round(#latitude * 100) + ',' + T(java.lang.Math).round(#longitude * 100)",
+            unless = "#result == null")
     @CircuitBreaker(name = "openMeteo", fallbackMethod = "getPollutionDataFallback")
     @Retry(name = "openMeteo")
     public PollutionData getPollutionData(double latitude, double longitude) {
@@ -47,52 +43,31 @@ public class OpenMeteoAqiClient {
         String url = UriComponentsBuilder.fromUriString(OPEN_METEO_URL)
                 .queryParam("latitude", clampedLat)
                 .queryParam("longitude", normalizedLon)
-                .queryParam("hourly", "european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone")
-                .queryParam("timezone", "auto")
+                .queryParam("current", CURRENT_FIELDS)
+                .queryParam("timezone", "GMT")
                 .toUriString();
 
         OpenMeteoAqiResponse response = restTemplate.getForObject(url, OpenMeteoAqiResponse.class);
-            
-            if (response != null && response.getHourly() != null) {
-                int index = getCurrentHourIndex(response);
-                
-                double aqi = getValOrDefault(response.getHourly().getEuropean_aqi(), index, 50.0);
-                double pm25 = getValOrDefault(response.getHourly().getPm2_5(), index, 0.0);
-                double pm10 = getValOrDefault(response.getHourly().getPm10(), index, 0.0);
-                double co = getValOrDefault(response.getHourly().getCarbon_monoxide(), index, 0.0);
-                double no2 = getValOrDefault(response.getHourly().getNitrogen_dioxide(), index, 0.0);
-                double ozone = getValOrDefault(response.getHourly().getOzone(), index, 0.0);
-                
-                return new PollutionData(aqi, pm25, pm10, no2, ozone, co);
-            }
+        if (response == null || response.current == null || response.current.european_aqi == null) {
+            return null;
+        }
+        OpenMeteoAqiResponse.Current c = response.current;
+        return new PollutionData(
+                c.european_aqi,
+                orZero(c.pm2_5),
+                orZero(c.pm10),
+                orZero(c.nitrogen_dioxide),
+                orZero(c.ozone),
+                orZero(c.carbon_monoxide));
+    }
+
+    @SuppressWarnings("unused") // invoked by Resilience4j
+    public PollutionData getPollutionDataFallback(double latitude, double longitude, Throwable t) {
+        logger.warn("Open-Meteo unavailable for ({}, {}): {}", latitude, longitude, t.getMessage());
         return null;
     }
 
-    public PollutionData getPollutionDataFallback(double latitude, double longitude, Throwable t) {
-        logger.warn("OpenMeteo API failed or circuit broken for lat: {}, lon: {}. Reason: {}", latitude, longitude, t.getMessage());
-        return new PollutionData(50.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-    }
-
-    private double getValOrDefault(java.util.List<Double> list, int index, double defaultVal) {
-        if (list != null && index >= 0 && index < list.size() && list.get(index) != null) {
-            return list.get(index);
-        }
-        return defaultVal;
-    }
-
-    private int getCurrentHourIndex(OpenMeteoAqiResponse response) {
-        // Open Meteo returns historical and forecast data.
-        // For simplicity, we assume index 0 is the start of the current day.
-        // A more robust implementation would search `response.getHourly().getTime()` 
-        // for the current LocalDateTime truncated to hours.
-        LocalDateTime now = LocalDateTime.now();
-        String currentHourPrefix = now.format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH"));
-        
-        for (int i = 0; i < response.getHourly().getTime().size(); i++) {
-            if (response.getHourly().getTime().get(i).startsWith(currentHourPrefix)) {
-                return i;
-            }
-        }
-        return 0; // Fallback to first element if not found
+    private static double orZero(Double value) {
+        return value == null ? 0.0 : value;
     }
 }

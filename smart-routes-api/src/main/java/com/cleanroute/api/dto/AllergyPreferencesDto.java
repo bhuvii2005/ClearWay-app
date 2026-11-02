@@ -1,16 +1,12 @@
 package com.cleanroute.api.dto;
 
-import java.util.UUID;
 
 public class AllergyPreferencesDto {
-    private UUID userId;
     private boolean avoidPm25;
     private boolean avoidOzone;
     private boolean avoidPm10;
     private boolean avoidNo2;
 
-    public UUID getUserId() { return userId; }
-    public void setUserId(UUID userId) { this.userId = userId; }
 
     public boolean isAvoidPm25() { return avoidPm25; }
     public void setAvoidPm25(boolean avoidPm25) { this.avoidPm25 = avoidPm25; }

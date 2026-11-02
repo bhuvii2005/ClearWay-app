@@ -9,6 +9,7 @@ public class RouteDto {
     private String name;
     private String type;
     private Double distanceKm;
+    private Integer travelTimeSeconds;
     private Double lastPollutionScore;
     private Double avgPollutionScore;
     private ZonedDateTime lastCheckedAt;
@@ -22,6 +23,7 @@ public class RouteDto {
         this.name = route.getName();
         this.type = route.getType();
         this.distanceKm = route.getDistanceKm();
+        this.travelTimeSeconds = route.getTravelTimeSeconds();
         this.lastPollutionScore = route.getLastPollutionScore();
         this.avgPollutionScore = route.getAvgPollutionScore();
         this.lastCheckedAt = route.getLastCheckedAt();
@@ -41,6 +43,9 @@ public class RouteDto {
     public Double getDistanceKm() { return distanceKm; }
     public void setDistanceKm(Double distanceKm) { this.distanceKm = distanceKm; }
     
+    public Integer getTravelTimeSeconds() { return travelTimeSeconds; }
+    public void setTravelTimeSeconds(Integer travelTimeSeconds) { this.travelTimeSeconds = travelTimeSeconds; }
+
     public Double getLastPollutionScore() { return lastPollutionScore; }
     public void setLastPollutionScore(Double lastPollutionScore) { this.lastPollutionScore = lastPollutionScore; }
     

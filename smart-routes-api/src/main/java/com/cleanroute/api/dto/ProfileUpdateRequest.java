@@ -1,7 +1,10 @@
 package com.cleanroute.api.dto;
 
 public class ProfileUpdateRequest {
+    @jakarta.validation.constraints.Size(max = 100, message = "Name must not exceed 100 characters")
     private String name;
+
+    @jakarta.validation.constraints.Size(max = 30, message = "Phone must not exceed 30 characters")
     private String phone;
     private Boolean whatsappOptIn;
 

@@ -1,30 +1,22 @@
 package com.cleanroute.api.controller;
 
-import com.cleanroute.api.dto.CreateRouteRequest;
-import com.cleanroute.api.dto.ErrorResponse;
-import com.cleanroute.api.entity.Route;
-import com.cleanroute.api.dto.AlternativeRouteDto;
-import com.cleanroute.api.dto.RouteDto;
+import com.cleanroute.api.dto.*;
 import com.cleanroute.api.service.RouteService;
+import com.cleanroute.api.util.CurrentUser;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import jakarta.validation.Valid;
-
+/**
+ * Route endpoints. All require a Bearer token and only ever expose the caller's own routes.
+ */
 @RestController
 @RequestMapping("/api/v1/routes")
 public class RouteController {
-
-    private static final Logger logger = LoggerFactory.getLogger(RouteController.class);
 
     private final RouteService routeService;
 
@@ -32,97 +24,51 @@ public class RouteController {
         this.routeService = routeService;
     }
 
-    private UUID getAuthenticatedUserId() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if (principal instanceof UUID) {
-            return (UUID) principal;
-        }
-        return null;
-    }
-
+    /** Up to three road-snapped routes between two points, cleanest first. Nothing is saved. */
     @PostMapping("/alternatives")
-    public ResponseEntity<?> computeAlternativeRoutes(@Valid @RequestBody CreateRouteRequest request) {
-        logger.info("Calculating alternatives for route: {}", request.getName());
-        UUID currentUserId = getAuthenticatedUserId();
-        if (currentUserId != null) {
-            request.setUserId(currentUserId);
-        }
-
-        List<AlternativeRouteDto> alternatives = routeService.fetchAlternatives(request);
-        return ResponseEntity.ok(alternatives);
+    public List<AlternativeRouteDto> computeAlternativeRoutes(@Valid @RequestBody AlternativesRequest request) {
+        return routeService.fetchAlternatives(CurrentUser.id(), request);
     }
 
+    /** Saves a route (usually one of the alternatives) and scores it immediately. */
     @PostMapping
-    public ResponseEntity<?> createRoute(@Valid @RequestBody CreateRouteRequest request) {
-        logger.info("Received request to create route: {}", request.getName());
-        UUID currentUserId = getAuthenticatedUserId();
-        if (currentUserId != null) {
-            request.setUserId(currentUserId);
-        } else if (request.getUserId() == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(401, "Unauthorized", "User authentication required"));
-        }
-
-        Route createdRoute = routeService.createRoute(request);
-        logger.info("Successfully created route with ID: {}", createdRoute.getId());
-        return ResponseEntity.ok(new RouteDto(createdRoute));
+    public ResponseEntity<RouteDto> createRoute(@Valid @RequestBody CreateRouteRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new RouteDto(routeService.createRoute(CurrentUser.id(), request)));
     }
 
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getUserRoutes(@PathVariable UUID userId) {
-        UUID authUserId = getAuthenticatedUserId();
-        if (authUserId != null && !authUserId.equals(userId)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(403, "Forbidden", "Cannot view routes for another user"));
-        }
+    /** The caller's saved routes, newest first, without geometry. */
+    @GetMapping
+    public List<RouteDto> listRoutes() {
+        return routeService.getRoutesForUser(CurrentUser.id()).stream().map(RouteDto::new).toList();
+    }
 
-        List<Route> routes = routeService.getActiveRoutesForUser(userId);
-        
-        List<RouteDto> routeDtos = routes.stream()
-                .map(RouteDto::new)
-                .collect(Collectors.toList());
-                
-        return ResponseEntity.ok(routeDtos);
+    /** One saved route including its geometry. */
+    @GetMapping("/{routeId}")
+    public RouteDetailDto getRoute(@PathVariable UUID routeId) {
+        return routeService.getRoute(routeId, CurrentUser.id());
+    }
+
+    /** Renames a route or turns monitoring on or off. */
+    @PatchMapping("/{routeId}")
+    public RouteDto updateRoute(@PathVariable UUID routeId, @Valid @RequestBody UpdateRouteRequest request) {
+        return new RouteDto(routeService.updateRoute(routeId, CurrentUser.id(), request));
     }
 
     @DeleteMapping("/{routeId}")
-    public ResponseEntity<?> deleteRoute(@PathVariable UUID routeId) {
-        UUID authUserId = getAuthenticatedUserId();
-        if (authUserId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(401, "Unauthorized", "User authentication required"));
-        }
-
-        try {
-            routeService.deleteRoute(routeId, authUserId);
-            return ResponseEntity.ok().build();
-        } catch (IllegalArgumentException e) {
-            if (e.getMessage().contains("Forbidden")) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(403, "Forbidden", e.getMessage()));
-            }
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(404, "Not Found", e.getMessage()));
-        }
+    public ResponseEntity<Void> deleteRoute(@PathVariable UUID routeId) {
+        routeService.deleteRoute(routeId, CurrentUser.id());
+        return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Exposure history for the last {@code days} days (1-90, default 7), with hourly averages
+     * computed in the IANA time zone {@code tz} (default UTC).
+     */
     @GetMapping("/{routeId}/metrics")
-    public ResponseEntity<?> getRouteMetrics(@PathVariable UUID routeId) {
-        UUID authUserId = getAuthenticatedUserId();
-        if (authUserId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(new ErrorResponse(401, "Unauthorized", "User authentication required"));
-        }
-
-        try {
-            // Check authorization implicitly via service or directly here
-            // (Assuming a simple implementation where service handles it, but we can just fetch via RouteService)
-            // Let's keep it simple: fetch active routes for user, check if routeId is in it.
-            boolean ownsRoute = routeService.getActiveRoutesForUser(authUserId).stream().anyMatch(r -> r.getId().equals(routeId));
-            if (!ownsRoute) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new ErrorResponse(403, "Forbidden", "Cannot access metrics for this route"));
-            }
-            
-            // To fetch metrics we need the repository, but we can do it via a service layer if it exists. 
-            // For now, let's just return a placeholder or implement it via a new RouteService method.
-            // A better way is to add getRouteMetrics(routeId, userId) to RouteService.
-            return ResponseEntity.ok().build(); 
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new ErrorResponse(500, "Server Error", e.getMessage()));
-        }
+    public RouteHistoryDto getRouteMetrics(@PathVariable UUID routeId,
+                                           @RequestParam(defaultValue = "7") int days,
+                                           @RequestParam(defaultValue = "UTC") String tz) {
+        return routeService.getHistory(routeId, CurrentUser.id(), days, tz);
     }
 }

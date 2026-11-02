@@ -34,6 +34,9 @@ public class Route {
     @Column(name = "distance_km")
     private Double distanceKm;
 
+    @Column(name = "travel_time_seconds")
+    private Integer travelTimeSeconds;
+
     @Column(name = "created_at", updatable = false)
     private ZonedDateTime createdAt;
 
@@ -150,5 +153,13 @@ public class Route {
 
     public void setMetrics(List<RouteMetrics> metrics) {
         this.metrics = metrics;
+    }
+
+    public Integer getTravelTimeSeconds() {
+        return travelTimeSeconds;
+    }
+
+    public void setTravelTimeSeconds(Integer travelTimeSeconds) {
+        this.travelTimeSeconds = travelTimeSeconds;
     }
 }

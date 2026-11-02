@@ -1,26 +1,23 @@
 package com.cleanroute.api.dto;
 
+import com.cleanroute.api.entity.Notification;
+
+import java.time.ZonedDateTime;
 import java.util.UUID;
 
-public class NotificationDto {
-    private UUID routeId;
-    private String routeName;
-    private String message;
+/** An alert as sent over WebSocket and returned by GET /api/v1/notifications. */
+public record NotificationDto(
+        UUID id,
+        UUID routeId,
+        String routeName,
+        String kind,
+        String message,
+        Double pollutionScore,
+        boolean read,
+        ZonedDateTime createdAt) {
 
-    public NotificationDto() {}
-
-    public NotificationDto(UUID routeId, String routeName, String message) {
-        this.routeId = routeId;
-        this.routeName = routeName;
-        this.message = message;
+    public static NotificationDto from(Notification n, String routeName) {
+        return new NotificationDto(n.getId(), n.getRouteId(), routeName, n.getKind().name(), n.getMessage(),
+                n.getPollutionScore(), n.isRead(), n.getCreatedAt());
     }
-
-    public UUID getRouteId() { return routeId; }
-    public void setRouteId(UUID routeId) { this.routeId = routeId; }
-
-    public String getRouteName() { return routeName; }
-    public void setRouteName(String routeName) { this.routeName = routeName; }
-
-    public String getMessage() { return message; }
-    public void setMessage(String message) { this.message = message; }
 }

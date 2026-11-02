@@ -37,6 +37,9 @@ public class User {
     @Column(name = "password_version")
     private Integer passwordVersion = 2;
 
+    @Column(name = "token_version", nullable = false)
+    private Integer tokenVersion = 0;
+
     @Column(name = "avoid_pm25")
     private Boolean avoidPm25 = false;
 
@@ -152,10 +155,6 @@ public class User {
         return salt;
     }
 
-    public String getPasswordSalt() {
-        return salt;
-    }
-
     public void setSalt(String salt) {
         this.salt = salt;
     }
@@ -198,5 +197,18 @@ public class User {
 
     public void setAvoidNo2(Boolean avoidNo2) {
         this.avoidNo2 = avoidNo2;
+    }
+
+    public Integer getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void setTokenVersion(Integer tokenVersion) {
+        this.tokenVersion = tokenVersion;
+    }
+
+    /** Invalidates every token issued so far (logout, password change). */
+    public void revokeTokens() {
+        this.tokenVersion = (tokenVersion == null ? 0 : tokenVersion) + 1;
     }
 }

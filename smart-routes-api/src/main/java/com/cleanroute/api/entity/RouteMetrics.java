@@ -27,6 +27,16 @@ public class RouteMetrics {
 
     private Double temperature;
 
+    private Double aqi;
+
+    private Double pm25;
+
+    private Double pm10;
+
+    private Double no2;
+
+    private Double ozone;
+
     @PrePersist
     protected void onCreate() {
         timestamp = ZonedDateTime.now();
@@ -80,5 +90,45 @@ public class RouteMetrics {
 
     public void setTemperature(Double temperature) {
         this.temperature = temperature;
+    }
+
+    public Double getAqi() {
+        return aqi;
+    }
+
+    public void setAqi(Double aqi) {
+        this.aqi = aqi;
+    }
+
+    public Double getPm25() {
+        return pm25;
+    }
+
+    public void setPm25(Double pm25) {
+        this.pm25 = pm25;
+    }
+
+    public Double getPm10() {
+        return pm10;
+    }
+
+    public void setPm10(Double pm10) {
+        this.pm10 = pm10;
+    }
+
+    public Double getNo2() {
+        return no2;
+    }
+
+    public void setNo2(Double no2) {
+        this.no2 = no2;
+    }
+
+    public Double getOzone() {
+        return ozone;
+    }
+
+    public void setOzone(Double ozone) {
+        this.ozone = ozone;
     }
 }

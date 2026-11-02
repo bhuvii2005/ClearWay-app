@@ -11,21 +11,24 @@ spring:
     driver-class-name: org.postgresql.Driver
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
     hibernate:
       ddl-auto: validate
-    properties:
-      hibernate:
-        format_sql: true
     show-sql: false
   flyway:
     enabled: true
     baseline-on-migrate: true
   cache:
+    cache-names: aqi
     caffeine:
-      spec: maximumSize=500,expireAfterWrite=900s
+      # Open-Meteo updates hourly; 15 minutes keeps data fresh while cutting repeat calls
+      spec: maximumSize=5000,expireAfterWrite=900s
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8090}
+
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173}
 
 tomtom:
   api:
@@ -35,7 +38,65 @@ jwt:
   secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
+pollution:
+  max-samples-per-route: 10
+  scheduler:
+    enabled: ${SCHEDULER_ENABLED:true}
+    interval: 900000        # 15 minutes
+    initial-delay: 60000
+
+alerts:
+  poor-threshold: 75        # European AQI above this triggers a POOR_AIR alert
+  cooldown-minutes: 120     # at most one alert per route in this window
+
+security:
+  auth-rate-limit:
+    per-minute: 10          # login/signup attempts per IP per minute
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      tomtom: &cb
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        ignore-exceptions:
+          - com.cleanroute.api.exception.ApiException
+          - org.springframework.web.client.HttpClientErrorException
+      openMeteo: *cb
+  retry:
+    instances:
+      tomtom: &retry
+        max-attempts: 2
+        wait-duration: 500ms
+        ignore-exceptions:
+          - com.cleanroute.api.exception.ApiException
+          - org.springframework.web.client.HttpClientErrorException
+      openMeteo: *retry
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: ClearWay API
+    description: Pollution-aware route recommendations
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
 logging:
   level:
     root: INFO
-    com.cleanroute: DEBUG
+    com.cleanroute: INFO

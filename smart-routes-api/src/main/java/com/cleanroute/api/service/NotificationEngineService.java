@@ -1,57 +1,72 @@
 package com.cleanroute.api.service;
 
+import com.cleanroute.api.entity.Notification;
 import com.cleanroute.api.entity.Route;
 import com.cleanroute.api.entity.RouteMetrics;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.cleanroute.api.repository.NotificationRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
-import com.cleanroute.api.dto.NotificationDto;
 
+import java.time.Duration;
+import java.time.ZonedDateTime;
+
+/**
+ * Decides when a fresh score on a monitored route deserves an alert.
+ *
+ * <ul>
+ *   <li>POOR_AIR: score above {@code poorThreshold} (European AQI 75 by default).</li>
+ *   <li>CLEAN_AIR: score at least 30% below the route's historical average.</li>
+ * </ul>
+ * At most one alert per route is sent within the cooldown window, so the 15-minute
+ * scheduler does not repeat the same message.
+ */
 @Service
 public class NotificationEngineService {
 
-    private static final Logger logger = LoggerFactory.getLogger(NotificationEngineService.class);
-    private final SimpMessagingTemplate messagingTemplate;
+    static final double CLEAN_RATIO = 0.7;
 
-    public NotificationEngineService(SimpMessagingTemplate messagingTemplate) {
-        this.messagingTemplate = messagingTemplate;
+    private final NotificationService notificationService;
+    private final NotificationRepository notificationRepository;
+    private final double poorThreshold;
+    private final Duration cooldown;
+
+    public NotificationEngineService(NotificationService notificationService,
+                                     NotificationRepository notificationRepository,
+                                     @Value("${alerts.poor-threshold:75}") double poorThreshold,
+                                     @Value("${alerts.cooldown-minutes:120}") long cooldownMinutes) {
+        this.notificationService = notificationService;
+        this.notificationRepository = notificationRepository;
+        this.poorThreshold = poorThreshold;
+        this.cooldown = Duration.ofMinutes(cooldownMinutes);
     }
 
-    // Thresholds
-    private static final double PM25_POOR_THRESHOLD = 35.0; 
-    private static final double EUROPEAN_AQI_POOR_THRESHOLD = 75.0;
-
     /**
-     * Checks if a score breaches thresholds and triggers notifications.
+     * @param previousAverage the route's average score before this run (null when unknown)
      */
-    public void analyzeAndNotify(Route route, RouteMetrics metrics) {
-        if (metrics.getPollutionScore() == null) {
+    public void analyzeAndNotify(Route route, RouteMetrics metrics, Double previousAverage) {
+        Double score = metrics.getPollutionScore();
+        if (score == null || route.getUser() == null) {
             return;
         }
 
-        if (metrics.getPollutionScore() > EUROPEAN_AQI_POOR_THRESHOLD) {
-            sendNotification(route, "Air quality is poor (" + metrics.getPollutionScore() + " AQI). Avoid this route if possible.");
-        } 
-        else if (isSignificantlyBetterThanAverage(route, metrics)) {
-            sendNotification(route, "Air quality on your route is exceptionally clear today (" + metrics.getPollutionScore() + " AQI). Great time for a run!");
+        Notification.Kind kind;
+        String message;
+        long rounded = Math.round(score);
+        if (score > poorThreshold) {
+            kind = Notification.Kind.POOR_AIR;
+            message = "Air quality on \"" + route.getName() + "\" is poor right now (score " + rounded
+                    + "). Consider another route or time.";
+        } else if (previousAverage != null && previousAverage > 0 && score < previousAverage * CLEAN_RATIO) {
+            kind = Notification.Kind.CLEAN_AIR;
+            message = "Air on \"" + route.getName() + "\" is unusually clean right now (score " + rounded
+                    + " vs a usual " + Math.round(previousAverage) + "). A good time to go.";
+        } else {
+            return;
         }
-    }
 
-    private boolean isSignificantlyBetterThanAverage(Route route, RouteMetrics metrics) {
-        if (route.getAvgPollutionScore() == null || route.getAvgPollutionScore() == 0) return false;
-        
-        // If current score is 30% better than average
-        return metrics.getPollutionScore() < (route.getAvgPollutionScore() * 0.7);
-    }
-
-    private void sendNotification(Route route, String message) {
-        logger.info("NOTIFICATION TRIGGERED for User: {}", route.getUser().getEmail());
-        
-        // Push to React UI via WebSocket
-        if (route.getUser() != null && route.getUser().getId() != null) {
-            String destination = "/topic/alerts/" + route.getUser().getId().toString();
-            messagingTemplate.convertAndSend(destination, new NotificationDto(route.getId(), route.getName(), message));
+        if (notificationRepository.existsByRouteIdAndCreatedAtAfter(route.getId(), ZonedDateTime.now().minus(cooldown))) {
+            return;
         }
+        notificationService.send(route, kind, message, score);
     }
 }

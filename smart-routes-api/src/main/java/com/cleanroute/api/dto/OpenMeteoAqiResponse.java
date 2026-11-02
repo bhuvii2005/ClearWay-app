@@ -1,83 +1,22 @@
 package com.cleanroute.api.dto;
 
-import java.time.LocalDateTime;
-import java.util.List;
-
+/**
+ * Subset of the Open-Meteo Air Quality API response used by ClearWay.
+ * Requested with "current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,ozone",
+ * so Open-Meteo itself picks the reading for the current hour at that location.
+ * Field names match the JSON keys exactly.
+ */
 public class OpenMeteoAqiResponse {
-    
-    private Hourly hourly;
 
-    public Hourly getHourly() {
-        return hourly;
-    }
+    public Current current;
 
-    public void setHourly(Hourly hourly) {
-        this.hourly = hourly;
-    }
-
-    public static class Hourly {
-        private List<String> time;
-        private List<Double> european_aqi;
-        private List<Double> pm10;
-        private List<Double> pm2_5;
-        private List<Double> carbon_monoxide;
-        private List<Double> nitrogen_dioxide;
-        private List<Double> ozone;
-
-        public List<String> getTime() {
-            return time;
-        }
-
-        public void setTime(List<String> time) {
-            this.time = time;
-        }
-
-        public List<Double> getEuropean_aqi() {
-            return european_aqi;
-        }
-
-        public void setEuropean_aqi(List<Double> european_aqi) {
-            this.european_aqi = european_aqi;
-        }
-
-        public List<Double> getPm10() {
-            return pm10;
-        }
-
-        public void setPm10(List<Double> pm10) {
-            this.pm10 = pm10;
-        }
-
-        public List<Double> getPm2_5() {
-            return pm2_5;
-        }
-
-        public void setPm2_5(List<Double> pm2_5) {
-            this.pm2_5 = pm2_5;
-        }
-
-        public List<Double> getCarbon_monoxide() {
-            return carbon_monoxide;
-        }
-
-        public void setCarbon_monoxide(List<Double> carbon_monoxide) {
-            this.carbon_monoxide = carbon_monoxide;
-        }
-
-        public List<Double> getNitrogen_dioxide() {
-            return nitrogen_dioxide;
-        }
-
-        public void setNitrogen_dioxide(List<Double> nitrogen_dioxide) {
-            this.nitrogen_dioxide = nitrogen_dioxide;
-        }
-
-        public List<Double> getOzone() {
-            return ozone;
-        }
-
-        public void setOzone(List<Double> ozone) {
-            this.ozone = ozone;
-        }
+    public static class Current {
+        public String time;
+        public Double european_aqi;
+        public Double pm10;
+        public Double pm2_5;
+        public Double carbon_monoxide;
+        public Double nitrogen_dioxide;
+        public Double ozone;
     }
 }

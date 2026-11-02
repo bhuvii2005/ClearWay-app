@@ -1,102 +1,111 @@
 package com.cleanroute.api.service;
 
+import com.cleanroute.api.dto.PollutionData;
 import com.cleanroute.api.entity.Route;
 import com.cleanroute.api.entity.RouteMetrics;
 import com.cleanroute.api.entity.User;
-import com.cleanroute.api.dto.PollutionData;
 import com.cleanroute.api.service.integration.OpenMeteoAqiClient;
 import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+/**
+ * Computes a route's pollution exposure score.
+ *
+ * <p>Up to {@code maxSamples} points are sampled evenly along the route (always including both ends).
+ * For each point the base score is the European AQI. When the user is sensitive to a pollutant,
+ * that pollutant's concentration (µg/m³) is added with a weight:
+ * PM2.5 × 1.5, ozone × 1.2, NO₂ × 1.2, PM10 × 1.0.
+ * The route score is the mean of the point scores; lower is cleaner.
+ *
+ * <p>If no point could be sampled (air-quality service down), the returned metrics have a null score.
+ */
 @Service
 public class PollutionEngineService {
 
     private static final Logger logger = LoggerFactory.getLogger(PollutionEngineService.class);
 
+    static final double PM25_WEIGHT = 1.5;
+    static final double OZONE_WEIGHT = 1.2;
+    static final double NO2_WEIGHT = 1.2;
+    static final double PM10_WEIGHT = 1.0;
+
     private final OpenMeteoAqiClient aqiClient;
+    private final int maxSamples;
 
-    public PollutionEngineService(OpenMeteoAqiClient aqiClient) {
+    public PollutionEngineService(OpenMeteoAqiClient aqiClient,
+                                  @Value("${pollution.max-samples-per-route:10}") int maxSamples) {
         this.aqiClient = aqiClient;
+        this.maxSamples = Math.max(2, maxSamples);
     }
 
-    /**
-     * Calculates the pollution exposure score for a given route.
-     * Iterates over coordinate points along the route geometry,
-     * queries AQI for a spatial sample, and averages the results.
-     */
-    public RouteMetrics calculateExposureScore(Route route) {
-        return calculateExposureScore(route, null);
-    }
-
-    /**
-     * Calculates the pollution exposure score for a given route,
-     * applying weights for any user allergy preferences.
-     */
     public RouteMetrics calculateExposureScore(Route route, User user) {
-        LineString path = route.getPath();
-        Coordinate[] coordinates = path.getCoordinates();
-
+        Coordinate[] coordinates = route.getPath().getCoordinates();
         if (coordinates.length == 0) {
             throw new IllegalArgumentException("Route path must have at least one coordinate");
         }
 
-        double totalScore = 0.0;
-        int sampleCount = 0;
+        double scoreSum = 0, aqiSum = 0, pm25Sum = 0, pm10Sum = 0, no2Sum = 0, ozoneSum = 0;
+        int samples = 0;
 
-        // Sample every Nth coordinate to avoid excessive API calls
-        // For short routes, sample every coordinate. For long routes, sample 10 points.
-        int step = Math.max(1, coordinates.length / 10);
-
-        for (int i = 0; i < coordinates.length; i += step) {
-            Coordinate coord = coordinates[i];
-            PollutionData data = aqiClient.getPollutionData(coord.y, coord.x); // Y is lat, X is lon
-            
-            if (data != null) {
-                double pointScore = data.getAqi(); // Base european AQI
-                
-                // Apply allergy penalties
-                if (user != null) {
-                    if (Boolean.TRUE.equals(user.getAvoidPm25())) {
-                        pointScore += data.getPm25() * 1.5; // Penalize PM2.5 (ug/m3)
-                    }
-                    if (Boolean.TRUE.equals(user.getAvoidOzone())) {
-                        pointScore += data.getOzone() * 1.2; // Penalize Ozone (ug/m3)
-                    }
-                    if (Boolean.TRUE.equals(user.getAvoidPm10())) {
-                        pointScore += data.getPm10() * 1.0; // Penalize PM10 (ug/m3)
-                    }
-                    if (Boolean.TRUE.equals(user.getAvoidNo2())) {
-                        pointScore += data.getNo2() * 1.2; // Penalize NO2 (ug/m3)
-                    }
-                }
-                
-                totalScore += pointScore;
-                sampleCount++;
+        for (int index : sampleIndices(coordinates.length, maxSamples)) {
+            Coordinate coord = coordinates[index];
+            PollutionData data = aqiClient.getPollutionData(coord.y, coord.x); // y = latitude, x = longitude
+            if (data == null) {
+                continue;
             }
+            scoreSum += pointScore(data, user);
+            aqiSum += data.getAqi();
+            pm25Sum += data.getPm25();
+            pm10Sum += data.getPm10();
+            no2Sum += data.getNo2();
+            ozoneSum += data.getOzone();
+            samples++;
         }
-
-        Double avgScore;
-        if (sampleCount == 0) {
-            logger.warn("Could not fetch AQI for any coordinate on route: {}", route.getId());
-            avgScore = 50.0; // Fallback "Moderate" score
-        } else {
-            avgScore = totalScore / sampleCount;
-        }
-
-        // Apply hypothetical traffic factor if available (Optional for MVP).
-        double trafficFactor = 1.0; 
-        
-        // Final exposure score balances the AQI and the distance spent traveling
-        double exposureScore = avgScore * trafficFactor;
 
         RouteMetrics metrics = new RouteMetrics();
         metrics.setRoute(route);
-        metrics.setPollutionScore(exposureScore);
-        metrics.setTrafficIndex(trafficFactor);
-        
+        metrics.setTrafficIndex(1.0);
+        if (samples == 0) {
+            logger.warn("No air-quality samples available for route {}", route.getId());
+            return metrics;
+        }
+        metrics.setPollutionScore(round1(scoreSum / samples));
+        metrics.setAqi(round1(aqiSum / samples));
+        metrics.setPm25(round1(pm25Sum / samples));
+        metrics.setPm10(round1(pm10Sum / samples));
+        metrics.setNo2(round1(no2Sum / samples));
+        metrics.setOzone(round1(ozoneSum / samples));
         return metrics;
+    }
+
+    static double pointScore(PollutionData data, User user) {
+        double score = data.getAqi();
+        if (user != null) {
+            if (Boolean.TRUE.equals(user.getAvoidPm25())) score += data.getPm25() * PM25_WEIGHT;
+            if (Boolean.TRUE.equals(user.getAvoidOzone())) score += data.getOzone() * OZONE_WEIGHT;
+            if (Boolean.TRUE.equals(user.getAvoidPm10())) score += data.getPm10() * PM10_WEIGHT;
+            if (Boolean.TRUE.equals(user.getAvoidNo2())) score += data.getNo2() * NO2_WEIGHT;
+        }
+        return score;
+    }
+
+    /** Evenly spaced, distinct indices from 0 to length-1 inclusive, at most maxSamples of them. */
+    static int[] sampleIndices(int length, int maxSamples) {
+        int count = Math.min(length, maxSamples);
+        if (count == 1) {
+            return new int[]{0};
+        }
+        int[] indices = new int[count];
+        for (int i = 0; i < count; i++) {
+            indices[i] = (int) Math.round((double) i * (length - 1) / (count - 1));
+        }
+        return indices;
+    }
+
+    private static double round1(double value) {
+        return Math.round(value * 10.0) / 10.0;
     }
 }
