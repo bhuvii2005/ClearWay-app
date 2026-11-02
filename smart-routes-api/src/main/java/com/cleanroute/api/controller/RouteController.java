@@ -99,6 +99,8 @@ public class RouteController {
             }
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(404, "Not Found", e.getMessage()));
         }
+    }
+
     @GetMapping("/{routeId}/metrics")
     public ResponseEntity<?> getRouteMetrics(@PathVariable UUID routeId) {
         UUID authUserId = getAuthenticatedUserId();

@@ -21,7 +21,7 @@ public class JwtTokenProvider {
     private final long jwtExpirationMs;
 
     public JwtTokenProvider(
-            @Value("${jwt.secret:REMOVED_JWT_SECRET}") String secret,
+            @Value("${jwt.secret}") String secret,
             @Value("${jwt.expiration-ms:86400000}") long jwtExpirationMs) {
         byte[] keyBytes;
         try {
@@ -29,14 +29,11 @@ public class JwtTokenProvider {
         } catch (IllegalArgumentException e) {
             keyBytes = secret.getBytes();
         }
-        this.key = Keys.hmacShaKeyFor(keyBytes.length >= 32 ? keyBytes : padKey(keyBytes));
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException("JWT_SECRET must be at least 256 bits (32 bytes)");
+        }
+        this.key = Keys.hmacShaKeyFor(keyBytes);
         this.jwtExpirationMs = jwtExpirationMs;
-    }
-
-    private static byte[] padKey(byte[] original) {
-        byte[] padded = new byte[32];
-        System.arraycopy(original, 0, padded, 0, Math.min(original.length, 32));
-        return padded;
     }
 
     public String generateToken(UUID userId, String email) {

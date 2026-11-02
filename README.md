@@ -26,7 +26,7 @@ Ensure Docker Desktop is running on your machine. Start the PostGIS database con
 ```bash
 docker compose up -d
 ```
-This starts the PostgreSQL PostGIS container mapped to port 5434.
+This starts the PostgreSQL PostGIS container mapped to port 5435.
 
 ### 2. Start the Backend API
 
@@ -60,7 +60,7 @@ This starts the PostgreSQL PostGIS container mapped to port 5434.
 
 The backend relies on the following environment variables. In a production environment or for custom local setups, these should be configured:
 
-- `SPRING_DATASOURCE_URL`: JDBC URL for PostgreSQL (default: `jdbc:postgresql://localhost:5434/cleanroute_db`)
+- `SPRING_DATASOURCE_URL`: JDBC URL for PostgreSQL (default: `jdbc:postgresql://localhost:5435/cleanroute_db`)
 - `SPRING_DATASOURCE_USERNAME`: Database user (default: `postgres`)
 - `SPRING_DATASOURCE_PASSWORD`: Database password (default: `postgres` or set via environment variable)
 - `TOMTOM_API_KEY`: API Key for the TomTom Routing API.

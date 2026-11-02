@@ -152,6 +152,10 @@ public class User {
         return salt;
     }
 
+    public String getPasswordSalt() {
+        return salt;
+    }
+
     public void setSalt(String salt) {
         this.salt = salt;
     }
