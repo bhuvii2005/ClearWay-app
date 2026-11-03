@@ -1,89 +1,130 @@
 # ClearWay
 
-ClearWay is a full-stack web application designed to calculate real-time pollution exposure along commuter travel paths and recommend cleaner alternative routes.
+[![CI](https://github.com/bhuvii2005/ClearWay-app/actions/workflows/ci.yml/badge.svg)](https://github.com/bhuvii2005/ClearWay-app/actions/workflows/ci.yml)
+
+ClearWay finds walking, jogging, cycling and driving routes with cleaner air. It compares real street routes by the pollution along them, watches your saved routes, and alerts you when the air on one turns poor.
 
 ## Features
 
-* **Geospatial Map:** Interactive map built with React and Leaflet.
-* **Real Street Routing:** Snaps waypoints to actual roads and generates up to three alternative routes via the TomTom Routing API.
-* **Live Air Quality:** Queries the Open-Meteo Air Quality API for real-time measurements of AQI, PM2.5, PM10, CO, NO2, and Ozone.
-* **Secure Authentication:** JWT-based stateless authentication with BCrypt password hashing and Spring Security integration.
-* **Allergy Avoidance Toggles:** Allows users to select sensitivity triggers (PM2.5, Ozone, PM10, NO2). The routing engine dynamically adds weight penalties to segments high in selected pollutants, immediately re-prioritizing cleaner options on the map.
-* **Address Search & Travel Modes:** Search places as you type (free Photon/OpenStreetMap geocoder) or click the map; compare walking, jogging, cycling and driving routes.
-* **Saved Routes & History:** Save a route, watch it for poor air, and see its score history, average by hour of day, and the cleanest time to travel.
-* **Live Alerts:** Alerts arrive instantly over a private WebSocket channel and are stored, so missed alerts appear on the Alerts page.
-* **Commute Scheduler:** Background worker running every 15 minutes to evaluate exposure trends along saved active routes and trigger warnings.
+- **Compare routes by air quality:** up to three real street routes (TomTom), each scored with live air-quality data (Open-Meteo: European AQI, PM2.5, PM10, NO₂, O₃, CO).
+- **Address search or map clicks:** place search as you type (Photon, OpenStreetMap), draggable pins, or your current location.
+- **Pollutant sensitivities:** choose pollutants to avoid (PM2.5, PM10, ozone, NO₂) and routes high in them rank lower.
+- **Saved and watched routes:** a background job re-checks watched routes every 15 minutes.
+- **Live alerts:** sent instantly over a private WebSocket channel and stored, so missed alerts are still listed.
+- **History and best times:** score history, average by hour of day, and the cleanest and worst times to travel.
+- **Accounts:** JWT sign-in, BCrypt passwords, password change, sign out on all devices, delete account.
 
-## Tech Stack
+## Tech stack
 
-* **Frontend:** React 19 (Vite), React Router 7, Tailwind CSS v4, React-Leaflet, Recharts, STOMP over SockJS, Axios
-* **Backend:** Java 17, Spring Boot 4, Hibernate Spatial, Spring Data JPA
-* **Database:** PostgreSQL 15+ with the PostGIS extension, managed inside a Docker container
-* **Migrations:** Flyway Database Migrations
+| Part | Technology |
+|---|---|
+| Web app | React 19, Vite 7, React Router 7, Tailwind CSS 4, React-Leaflet, Recharts, STOMP over SockJS |
+| API | Java 17, Spring Boot 4, Spring Security, Hibernate Spatial, Resilience4j, Caffeine |
+| Database | PostgreSQL 15 with PostGIS, Flyway migrations |
+| Tooling | Docker Compose, GitHub Actions, JUnit 5 + Testcontainers, Vitest, Playwright smoke test |
 
-## Setup Guide
+Every external service used is free and needs at most a free key (only TomTom).
 
-### 1. Start the Database (Docker)
+## Setup
 
-Ensure Docker Desktop is running on your machine. Start the PostGIS database container in the root directory:
+### 1. Create your `.env`
+
+All settings and secrets live in one git-ignored file at the project root. Start from the example:
+
 ```bash
-docker compose up -d
+cp .env.example .env
 ```
-This starts the PostgreSQL PostGIS container mapped to port 5435.
 
-### 2. Start the Backend API
+Then replace each `change_me_...` placeholder in `.env`:
 
-1. Navigate to the backend directory:
-   ```bash
-   cd smart-routes-api
-   ```
-2. Configure the Java 17 path (Windows PowerShell example):
-   ```powershell
-   $env:JAVA_HOME="C:\Program Files\Java\jdk-17.0.2"; $env:Path="$env:JAVA_HOME\bin;$env:Path"
-   ```
-3. Run the Spring Boot server (Flyway migrations will run automatically on startup):
-   ```bash
-   ./gradlew bootRun
-   ```
+| Setting | What to put |
+|---|---|
+| `POSTGRES_PASSWORD`, `SPRING_DATASOURCE_PASSWORD` | The same strong password in both |
+| `TOMTOM_API_KEY` | A free key from [developer.tomtom.com](https://developer.tomtom.com) (Dashboard > Keys) |
+| `JWT_SECRET` | A long random value, e.g. the output of `openssl rand -base64 48` |
 
-### 3. Start the Frontend Server
+Never commit `.env` or put real values in `.env.example`.
 
-1. Navigate to the frontend directory:
-   ```bash
-   cd smart-routes-ui
-   ```
-2. Install dependencies and start the Vite server:
-   ```bash
-   npm install
-   npm run dev
-   ```
-3. Open `http://localhost:5173` in your browser and create an account.
+### 2a. Run everything with Docker (easiest)
 
-Route search needs a free TomTom key in the root `.env` (`TOMTOM_API_KEY`). See `smart-routes-ui/README.md` for the front-end structure.
+Needs only Docker Desktop.
 
-## Configuration / Environment Variables
+```bash
+docker compose up -d --build
+```
 
-The backend relies on the following environment variables. In a production environment or for custom local setups, these should be configured:
+| Service | Address |
+|---|---|
+| Web app | http://localhost:4173 |
+| API | http://localhost:8090 (API docs at `/swagger-ui.html`) |
+| Database | localhost:5435 |
 
-- `SPRING_DATASOURCE_URL`: JDBC URL for PostgreSQL (default: `jdbc:postgresql://localhost:5435/cleanroute_db`)
-- `SPRING_DATASOURCE_USERNAME`: Database user (default: `postgres`)
-- `SPRING_DATASOURCE_PASSWORD`: Database password (default: `postgres` or set via environment variable)
-- `TOMTOM_API_KEY`: API Key for the TomTom Routing API.
-- `JWT_SECRET`: Secret key for JWT token generation.
-- `JWT_EXPIRATION_MS`: JWT token expiration time in milliseconds.
+Stop it with `docker compose down`. Your data stays in the `postgres-data` volume; `docker compose down -v` deletes it.
 
-## API Reference
+### 2b. Run for development
 
-The application exposes the following REST APIs:
+Needs Docker Desktop, Java 17 and Node 22.
 
-### Authentication (`/api/v1/auth`)
-- `POST /signup`: Register a new user (requires `name`, `email`, `password`). Returns a JWT token.
-- `POST /login`: Authenticate a user (requires `email`, `password`). Returns the user profile and a JWT token.
-- `POST /preferences`: Update user allergy sensitivities (requires `userId`, and `avoidPm25`, `avoidOzone`, `avoidPm10`, `avoidNo2` booleans). Requires `Authorization: Bearer <token>`.
+```bash
+docker compose up -d db                     # database only
 
-### Routes (`/api/v1/routes`) (Requires `Authorization: Bearer <token>`)
-- `POST /`: Create and save a new route to the database.
-- `POST /alternatives`: Fetch road-snapped alternative routes between a start and end point, scored and ranked by pollution exposure.
+cd smart-routes-api && ./gradlew bootRun    # API on :8090, runs migrations on start
+
+cd smart-routes-ui && npm install && npm run dev   # web app on http://localhost:5173
+```
+
+The API reads the root `.env` automatically. On Windows, if Java 17 is not the default:
+`$env:JAVA_HOME="C:\Program Files\Java\jdk-17.0.2"` before `./gradlew bootRun`.
+
+## Tests
+
+| Command | What it checks |
+|---|---|
+| `cd smart-routes-api && ./gradlew test` | 34 tests: services, security, and full API + WebSocket flows against a throwaway PostGIS container (needs Docker running) |
+| `cd smart-routes-ui && npm test` | Air-quality bands, wording, and the API client |
+| `cd smart-routes-ui && npm run lint` | Code style and React rules |
+| `cd smart-routes-ui && npm run e2e` | Full browser journey against a running app (set `E2E_BASE_URL=http://localhost:4173` for the Docker version) |
+
+Tests never use your real database or API keys: outside services are mocked and the database is created fresh for each run.
+
+## Continuous integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request:
+
+1. **API:** build and all backend tests, using a throwaway PostGIS container.
+2. **Web app:** lint, unit tests and production build.
+3. **Docker:** checks `docker-compose.yml` and builds both images (nothing is pushed or deployed).
+
+No repository secrets are needed today. If a future step needs a credential, add it under **Settings > Secrets and variables > Actions** and use `${{ secrets.NAME }}` in the workflow.
+
+## API overview
+
+All endpoints except sign-up, login and health need `Authorization: Bearer <token>`. Full interactive docs: `/swagger-ui.html`.
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /api/v1/auth/signup`, `/login` | Create an account or sign in; returns a token |
+| `GET /api/v1/auth/me` | Current user |
+| `PUT /api/v1/auth/profile`, `POST /api/v1/auth/preferences` | Update name or pollutant sensitivities |
+| `POST /api/v1/auth/password`, `/logout` | Change password; sign out on all devices |
+| `DELETE /api/v1/auth/account` | Delete the account and its data |
+| `POST /api/v1/routes/alternatives` | Compare routes between two points for a travel mode |
+| `POST /api/v1/routes`, `GET /api/v1/routes` | Save a route; list saved routes |
+| `GET`, `PATCH`, `DELETE /api/v1/routes/{id}` | View, rename or watch on/off, delete |
+| `GET /api/v1/routes/{id}/metrics` | Score history, hourly averages, best and worst hour |
+| `GET /api/v1/notifications`, `/unread-count` | Stored alerts |
+| `POST /api/v1/notifications/{id}/read`, `/read-all` | Mark alerts read |
+| WebSocket `/ws` → `/user/queue/alerts` | Live alerts (STOMP, token in the connect headers) |
+
+## Project structure
+
+```
+docker-compose.yml        Database, API and web app
+.env.example              Settings template (placeholders only)
+.github/workflows/ci.yml  Build and test on every push
+smart-routes-api/         Spring Boot API (+ Dockerfile)
+smart-routes-ui/          React web app (+ Dockerfile, nginx.conf); see its README
+```
 
 ## License
 

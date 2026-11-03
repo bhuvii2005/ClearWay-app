@@ -1,0 +1,11 @@
+# Never send secrets or local build output into the image.
+.env
+.env.*
+**/*.env
+build/
+bin/
+.gradle/
+.idea/
+.vscode/
+*.log
+HELP.md

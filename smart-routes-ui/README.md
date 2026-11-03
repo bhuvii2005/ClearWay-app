@@ -13,6 +13,8 @@ The API address comes from `VITE_API_URL` in `.env` (default `http://localhost:8
 
 Other scripts: `npm run build` (production build into `dist/`), `npm run preview`, `npm run lint`.
 
+In Docker (`docker compose up -d --build` from the project root) the app is built with `VITE_API_URL` from the root `.env` and served by nginx on http://localhost:4173. `nginx.conf` sends unknown paths to `index.html` so links like `/routes/42` work.
+
 ## Tests
 
 - `npm test`: unit tests (Vitest) for air-quality bands, wording and formatting, and the API client's sign-out-on-401 behaviour.

@@ -1,19 +1,53 @@
-version: '3.8'
+# ClearWay: database, API and web app.
+#   cp .env.example .env    then fill in real values (never commit .env)
+#   docker compose up -d db          database only, for local development
+#   docker compose up -d --build     everything: web http://localhost:4173, API http://localhost:8090
+#
+# Secrets (passwords, keys) are read from .env through env_file and never written in this file.
 
 services:
   db:
     image: postgis/postgis:15-3.4
     container_name: cleanroute-db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${POSTGRES_DB:-cleanroute_db}
+    env_file: .env              # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
     ports:
       - "${POSTGRES_PORT:-5435}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    build: ./smart-routes-api
+    container_name: cleanroute-api
+    env_file: .env              # DB login, JWT_SECRET, TOMTOM_API_KEY
+    environment:
+      # Inside Docker the database is reached by its service name, not localhost:5435.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-cleanroute_db}
+    ports:
+      - "${API_PORT:-8090}:8090"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./smart-routes-ui
+      args:
+        # Public address the browser uses to reach the API (not a secret).
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8090}
+    container_name: cleanroute-web
+    ports:
+      - "${WEB_PORT:-4173}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   postgres-data:
-        
