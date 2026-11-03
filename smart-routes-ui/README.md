@@ -13,6 +13,11 @@ The API address comes from `VITE_API_URL` in `.env` (default `http://localhost:8
 
 Other scripts: `npm run build` (production build into `dist/`), `npm run preview`, `npm run lint`.
 
+## Tests
+
+- `npm test`: unit tests (Vitest) for air-quality bands, wording and formatting, and the API client's sign-out-on-401 behaviour.
+- `npm run e2e`: browser smoke test with your installed Chrome. It signs up a throwaway `@test.dev` user, compares and saves a route, opens every page and fails on any browser error or failed request. Start the API and `npm run dev` first; route search needs the TomTom key. Screenshots land in `e2e/screenshots/` (git-ignored).
+
 ## Screens
 
 | Path | Page | What it does |
