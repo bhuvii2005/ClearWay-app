@@ -1,16 +1,52 @@
-# React + Vite
+# ClearWay web app
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The React front end for ClearWay. It talks to the Spring Boot API in `../smart-routes-api`.
 
-Currently, two official plugins are available:
+## Run it
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm install
+npm run dev        # http://localhost:5173
+```
 
-## React Compiler
+The API address comes from `VITE_API_URL` in `.env` (default `http://localhost:8090`). Copy `.env.example` to `.env` to change it.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Other scripts: `npm run build` (production build into `dist/`), `npm run preview`, `npm run lint`.
 
-## Expanding the ESLint configuration
+## Screens
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Path | Page | What it does |
+|---|---|---|
+| `/login`, `/signup` | `AuthPage` | Sign in or create an account |
+| `/` | `PlannerPage` | Search addresses or click the map, pick a travel mode, compare routes by air quality, save one |
+| `/routes` | `RoutesPage` | Saved routes with latest and average scores; watch on/off, rename, delete |
+| `/routes/:id` | `RouteDetailPage` | Route map, latest pollutants, score history chart, average by hour, cleanest and worst hour |
+| `/alerts` | `AlertsPage` | Stored alerts, unread markers, mark all read |
+| `/account` | `AccountPage` | Profile, pollutant sensitivities, password change, sign out everywhere, delete account |
+
+## Structure
+
+```
+src/
+  main.jsx               Router + providers
+  App.jsx                Routes and sign-in guard; secondary pages load lazily
+  lib/
+    api.js               Axios client, token storage, all API calls, error messages
+    format.js            Air-quality bands, units, durations, times
+    geocode.js           Address search via Photon (free, no key)
+    mapUtils.js          Map pins and coordinate helpers
+  context/
+    contexts.js          React contexts and hooks (useAuth, useToast, useAlerts)
+    AuthProvider.jsx     Session: token, current user, login/logout
+    ToastProvider.jsx    Corner notifications
+    AlertsProvider.jsx   Live alerts over STOMP/SockJS + unread count
+  components/            Layout, map pieces, address search, charts, icons, form controls
+  pages/                 One file per screen
+```
+
+## Free services used
+
+- **Map tiles:** OpenStreetMap standard tiles, darkened with a CSS filter. Attribution is shown on the map. Fine for development and light use. A busy public deployment should move to its own tile provider.
+- **Address search:** [Photon](https://photon.komoot.io) by Komoot, built on OpenStreetMap. No key needed.
+- **Charts:** Recharts.
+- **Live alerts:** `@stomp/stompjs` + `sockjs-client`, connecting to the API's `/ws` endpoint with the login token.

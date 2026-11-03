@@ -9,12 +9,15 @@ ClearWay is a full-stack web application designed to calculate real-time polluti
 * **Live Air Quality:** Queries the Open-Meteo Air Quality API for real-time measurements of AQI, PM2.5, PM10, CO, NO2, and Ozone.
 * **Secure Authentication:** JWT-based stateless authentication with BCrypt password hashing and Spring Security integration.
 * **Allergy Avoidance Toggles:** Allows users to select sensitivity triggers (PM2.5, Ozone, PM10, NO2). The routing engine dynamically adds weight penalties to segments high in selected pollutants, immediately re-prioritizing cleaner options on the map.
+* **Address Search & Travel Modes:** Search places as you type (free Photon/OpenStreetMap geocoder) or click the map; compare walking, jogging, cycling and driving routes.
+* **Saved Routes & History:** Save a route, watch it for poor air, and see its score history, average by hour of day, and the cleanest time to travel.
+* **Live Alerts:** Alerts arrive instantly over a private WebSocket channel and are stored, so missed alerts appear on the Alerts page.
 * **Commute Scheduler:** Background worker running every 15 minutes to evaluate exposure trends along saved active routes and trigger warnings.
 
 ## Tech Stack
 
-* **Frontend:** React 19 (Vite), Tailwind CSS v4, React-Leaflet, Axios
-* **Backend:** Java 17, Spring Boot 3, Hibernate Spatial, Spring Data JPA
+* **Frontend:** React 19 (Vite), React Router 7, Tailwind CSS v4, React-Leaflet, Recharts, STOMP over SockJS, Axios
+* **Backend:** Java 17, Spring Boot 4, Hibernate Spatial, Spring Data JPA
 * **Database:** PostgreSQL 15+ with the PostGIS extension, managed inside a Docker container
 * **Migrations:** Flyway Database Migrations
 
@@ -54,7 +57,9 @@ This starts the PostgreSQL PostGIS container mapped to port 5435.
    npm install
    npm run dev
    ```
-3. Open `http://localhost:5173` in your browser.
+3. Open `http://localhost:5173` in your browser and create an account.
+
+Route search needs a free TomTom key in the root `.env` (`TOMTOM_API_KEY`). See `smart-routes-ui/README.md` for the front-end structure.
 
 ## Configuration / Environment Variables
 

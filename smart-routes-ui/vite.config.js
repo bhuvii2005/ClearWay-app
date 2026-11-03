@@ -8,4 +8,24 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  // sockjs-client expects Node's `global`; point it at the browser global.
+  define: {
+    global: 'globalThis',
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Long-lived library code in separate files so browsers cache it across releases.
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          map: ['leaflet', 'react-leaflet'],
+          live: ['@stomp/stompjs', 'sockjs-client'],
+        },
+      },
+    },
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
 })
