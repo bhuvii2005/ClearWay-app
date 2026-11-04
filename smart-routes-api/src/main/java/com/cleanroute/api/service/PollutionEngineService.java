@@ -47,6 +47,7 @@ public class PollutionEngineService {
             throw new IllegalArgumentException("Route path must have at least one coordinate");
         }
 
+        RouteMetrics metrics = new RouteMetrics();
         double scoreSum = 0, aqiSum = 0, pm25Sum = 0, pm10Sum = 0, no2Sum = 0, ozoneSum = 0;
         int samples = 0;
 
@@ -63,9 +64,9 @@ public class PollutionEngineService {
             no2Sum += data.getNo2();
             ozoneSum += data.getOzone();
             samples++;
+            metrics.getSamples().add(java.util.List.of(coord.x, coord.y, data.getAqi()));
         }
 
-        RouteMetrics metrics = new RouteMetrics();
         metrics.setRoute(route);
         metrics.setTrafficIndex(1.0);
         if (samples == 0) {

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { Marker, Polyline } from 'react-leaflet';
 import { routesApi, errorMessage } from '../lib/api';
 import {
   POLLUTANTS,
@@ -15,8 +14,8 @@ import {
   userTimeZone,
 } from '../lib/format';
 import { useToast } from '../context/contexts';
-import { BaseMap, FitBounds, InvalidateOnResize } from '../components/map';
-import { pinIcon, toLatLngs } from '../lib/mapUtils';
+import { AirRoute, BaseMap, Pin } from '../components/map';
+import { boundsOf } from '../lib/mapUtils';
 import { HourlyChart, ScoreTrendChart } from '../components/charts';
 import Icon from '../components/Icon';
 import { BandChip, Card, EmptyState, ErrorNote, PageLoader, Toggle } from '../components/ui';
@@ -60,7 +59,7 @@ export default function RouteDetailPage() {
     };
   }, [routeId, days, timeZone]);
 
-  const path = useMemo(() => toLatLngs(route?.pathCoordinates), [route]);
+  const path = useMemo(() => route?.pathCoordinates ?? [], [route]);
   const points = history?.points ?? [];
   const latest = points.length ? points[points.length - 1] : null;
   const scored = points.filter((p) => p.pollutionScore != null);
@@ -137,13 +136,23 @@ export default function RouteDetailPage() {
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <div className="overflow-hidden rounded-2xl border border-slate-800">
           <div className="h-80">
-            <BaseMap className="h-full w-full" scrollWheelZoom={false}>
-              <InvalidateOnResize />
-              {path.length > 0 && <FitBounds points={path} padding={[32, 32]} />}
-              <Polyline positions={path} pathOptions={{ color: '#020617', weight: 9, opacity: 0.85 }} />
-              <Polyline positions={path} pathOptions={{ color: '#f8fafc', weight: 4 }} />
-              {path.length > 0 && <Marker position={path[0]} icon={pinIcon('origin')} />}
-              {path.length > 1 && <Marker position={path[path.length - 1]} icon={pinIcon('destination')} />}
+            <BaseMap
+              initialViewState={path.length > 1 ? { bounds: boundsOf(path), fitBoundsOptions: { padding: 40, maxZoom: 16 } } : undefined}
+              scrollZoom={false}
+            >
+              {path.length > 1 && (
+                <AirRoute
+                  id="saved-route"
+                  coords={path}
+                  score={latest?.pollutionScore ?? route.lastPollutionScore}
+                  animateKey={route.id}
+                  width={5}
+                />
+              )}
+              {path.length > 0 && <Pin kind="origin" longitude={path[0][0]} latitude={path[0][1]} />}
+              {path.length > 1 && (
+                <Pin kind="destination" longitude={path[path.length - 1][0]} latitude={path[path.length - 1][1]} />
+              )}
             </BaseMap>
           </div>
         </div>

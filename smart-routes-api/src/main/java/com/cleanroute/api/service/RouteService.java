@@ -105,6 +105,7 @@ public class RouteService {
             dto.setPollutionScore(metrics.getPollutionScore());
             dto.setPollutionData(new PollutionData(metrics.getAqi(), metrics.getPm25(), metrics.getPm10(),
                     metrics.getNo2(), metrics.getOzone(), 0.0));
+            dto.setAirSamples(metrics.getSamples());
             dto.setFastest(first);
             if (ttRoute.getSummary() != null) {
                 dto.setDistanceMeters(ttRoute.getSummary().getLengthInMeters());

@@ -13,12 +13,14 @@ export default defineConfig({
     global: 'globalThis',
   },
   build: {
+    // MapLibre GL alone is ~1 MB (~300 KB gzipped); it lives in its own cached "map" chunk.
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         // Long-lived library code in separate files so browsers cache it across releases.
         manualChunks: {
           react: ['react', 'react-dom', 'react-router-dom'],
-          map: ['leaflet', 'react-leaflet'],
+          map: ['maplibre-gl', 'react-map-gl/maplibre'],
           live: ['@stomp/stompjs', 'sockjs-client'],
         },
       },

@@ -23,6 +23,11 @@ public class AlternativeRouteDto {
     private double exposureSavingPercent;
     /** Mean pollutant readings along the route. */
     private PollutionData pollutionData;
+    /** Air quality at points along the route, start to end, as [longitude, latitude, European AQI]. */
+    private List<List<Double>> airSamples;
+
+    public List<List<Double>> getAirSamples() { return airSamples; }
+    public void setAirSamples(List<List<Double>> airSamples) { this.airSamples = airSamples; }
 
     public List<List<Double>> getPathCoordinates() { return pathCoordinates; }
     public void setPathCoordinates(List<List<Double>> pathCoordinates) { this.pathCoordinates = pathCoordinates; }

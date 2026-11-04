@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Marker, Polyline, useMapEvents } from 'react-leaflet';
 import { routesApi, errorMessage } from '../lib/api';
 import { coordinateLabel, reverseGeocode } from '../lib/geocode';
 import {
@@ -12,15 +11,13 @@ import {
   modeLabel,
 } from '../lib/format';
 import { useAuth, useToast } from '../context/contexts';
-import { BaseMap, ClickHandler, FitBounds, InvalidateOnResize } from '../components/map';
-import { pinIcon, toLatLngs } from '../lib/mapUtils';
+import { AirRoute, BaseMap, FitBounds, OtherRoutes, Pin } from '../components/map';
 import PlaceSearch from '../components/PlaceSearch';
 import Icon from '../components/Icon';
 import { BandChip, Button, ErrorNote, TextField, Toggle } from '../components/ui';
 
 const MAX_SAVED_POINTS = 10000;
-const SELECTED_COLOR = '#f8fafc';
-const OTHER_COLOR = '#64748b';
+const ALT_LAYERS = ['alt-routes'];
 
 function useIsWide() {
   const query = '(min-width: 1024px)';
@@ -32,11 +29,6 @@ function useIsWide() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
   return wide;
-}
-
-function CenterTracker({ onMove }) {
-  useMapEvents({ moveend: (e) => onMove(e.target.getCenter()) });
-  return null;
 }
 
 /** Keeps saved routes under the API's point limit while preserving both ends. */
@@ -66,6 +58,7 @@ export default function PlannerPage() {
   const [mapCenter, setMapCenter] = useState(null);
   const [locating, setLocating] = useState(false);
   const [searchId, setSearchId] = useState(0);
+  const [hoverRoute, setHoverRoute] = useState(false);
   const lookupRef = useRef({});
 
   const sensitivities = POLLUTANTS.filter((p) => user?.[p.pref]);
@@ -104,12 +97,6 @@ export default function PlannerPage() {
     },
     [setPoint],
   );
-
-  function handleMapClick(latlng) {
-    const target = !origin ? 'origin' : !destination ? 'destination' : focus;
-    dropPin(target, latlng);
-    if (target === 'origin' && !destination) setFocus('destination');
-  }
 
   function locateMe() {
     if (!navigator.geolocation) {
@@ -159,9 +146,26 @@ export default function PlannerPage() {
   }
 
   const fitPoints = useMemo(() => {
-    if (routes.length) return routes.flatMap((r) => toLatLngs(r.pathCoordinates));
-    return [origin, destination].filter(Boolean).map((p) => [p.lat, p.lng]);
+    if (routes.length) return routes.flatMap((r) => r.pathCoordinates);
+    return [origin, destination].filter(Boolean).map((p) => [p.lng, p.lat]);
   }, [routes, origin, destination]);
+
+  // Keep routes clear of the planner panel: left on wide screens, bottom sheet on phones.
+  const fitPadding = wide
+    ? { top: 60, bottom: 60, left: 460, right: 70 }
+    : { top: 40, bottom: Math.round(window.innerHeight * 0.58) + 24, left: 32, right: 32 };
+
+  function handleMapClick(e) {
+    const hit = e.features?.[0];
+    if (hit) {
+      setSelected(hit.properties.index);
+      return;
+    }
+    const { lat, lng } = e.lngLat;
+    const target = !origin ? 'origin' : !destination ? 'destination' : focus;
+    dropPin(target, { lat, lng });
+    if (target === 'origin' && !destination) setFocus('destination');
+  }
 
   const nextHint = !origin
     ? 'Search for a start point, or click the map.'
@@ -172,58 +176,43 @@ export default function PlannerPage() {
   return (
     <div className="relative h-full">
       <div className="absolute inset-0">
-        <BaseMap>
-          <InvalidateOnResize />
-          <ClickHandler onClick={handleMapClick} />
-          <CenterTracker onMove={(c) => setMapCenter({ lat: c.lat, lng: c.lng })} />
-          {fitPoints.length > 0 && (
-            <FitBounds
-              points={fitPoints}
-              paddingTopLeft={wide ? [450, 60] : [40, 40]}
-              padding={wide ? [60, 60] : [40, 40]}
+        <BaseMap
+          onClick={handleMapClick}
+          interactiveLayerIds={ALT_LAYERS}
+          cursor={hoverRoute ? 'pointer' : 'crosshair'}
+          onMouseEnter={() => setHoverRoute(true)}
+          onMouseLeave={() => setHoverRoute(false)}
+          onMoveEnd={(e) => setMapCenter({ lat: e.viewState.latitude, lng: e.viewState.longitude })}
+        >
+          {fitPoints.length > 0 && <FitBounds coords={fitPoints} padding={fitPadding} />}
+
+          {routes.length > 1 && <OtherRoutes routes={routes} selected={selected} />}
+          {routes[selected] && (
+            <AirRoute
+              coords={routes[selected].pathCoordinates}
+              samples={routes[selected].airSamples}
+              score={routes[selected].pollutionScore}
+              animateKey={`${searchId}-${selected}`}
             />
           )}
 
-          {routes.map((route, i) =>
-            i === selected ? null : (
-              <Polyline
-                key={`alt-${i}`}
-                positions={toLatLngs(route.pathCoordinates)}
-                pathOptions={{ color: OTHER_COLOR, weight: 5, opacity: 0.8, dashArray: '8 10' }}
-                eventHandlers={{ click: () => setSelected(i) }}
-              />
-            ),
-          )}
-          {routes[selected] && (
-            <>
-              <Polyline
-                positions={toLatLngs(routes[selected].pathCoordinates)}
-                pathOptions={{ color: '#020617', weight: 10, opacity: 0.85 }}
-                interactive={false}
-              />
-              <Polyline
-                positions={toLatLngs(routes[selected].pathCoordinates)}
-                pathOptions={{ color: SELECTED_COLOR, weight: 5 }}
-                interactive={false}
-              />
-            </>
-          )}
-
           {origin && (
-            <Marker
-              position={[origin.lat, origin.lng]}
-              icon={pinIcon('origin')}
+            <Pin
+              kind="origin"
+              longitude={origin.lng}
+              latitude={origin.lat}
               draggable
-              eventHandlers={{ dragend: (e) => dropPin('origin', e.target.getLatLng()) }}
+              onDragEnd={(e) => dropPin('origin', { lat: e.lngLat.lat, lng: e.lngLat.lng })}
               title="Start (drag to move)"
             />
           )}
           {destination && (
-            <Marker
-              position={[destination.lat, destination.lng]}
-              icon={pinIcon('destination')}
+            <Pin
+              kind="destination"
+              longitude={destination.lng}
+              latitude={destination.lat}
               draggable
-              eventHandlers={{ dragend: (e) => dropPin('destination', e.target.getLatLng()) }}
+              onDragEnd={(e) => dropPin('destination', { lat: e.lngLat.lat, lng: e.lngLat.lng })}
               title="Destination (drag to move)"
             />
           )}
@@ -232,7 +221,7 @@ export default function PlannerPage() {
 
       <aside
         aria-label="Route planner"
-        className="absolute inset-x-0 bottom-0 z-[1000] max-h-[58%] overflow-y-auto rounded-t-2xl border-t border-slate-800 bg-slate-950/95 p-4 shadow-2xl backdrop-blur lg:inset-x-auto lg:bottom-4 lg:left-4 lg:top-4 lg:max-h-none lg:w-[410px] lg:rounded-2xl lg:border lg:p-5"
+        className="absolute inset-x-0 bottom-0 z-10 max-h-[58%] overflow-y-auto rounded-t-2xl border-t border-slate-800 bg-slate-950/95 p-4 shadow-2xl backdrop-blur lg:inset-x-auto lg:bottom-4 lg:left-4 lg:top-4 lg:max-h-none lg:w-[410px] lg:rounded-2xl lg:border lg:p-5"
       >
         <h1 className="text-lg font-bold tracking-tight">Find a cleaner route</h1>
         <p className="mt-0.5 text-[13px] text-slate-400">Routes are ranked by the air along the way.</p>

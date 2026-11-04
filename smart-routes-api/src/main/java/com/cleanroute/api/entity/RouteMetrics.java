@@ -37,6 +37,14 @@ public class RouteMetrics {
 
     private Double ozone;
 
+    /** Each sampled point as [longitude, latitude, European AQI]. Not stored; used to colour routes on the map. */
+    @Transient
+    private java.util.List<java.util.List<Double>> samples = new java.util.ArrayList<>();
+
+    public java.util.List<java.util.List<Double>> getSamples() {
+        return samples;
+    }
+
     @PrePersist
     protected void onCreate() {
         timestamp = ZonedDateTime.now();
