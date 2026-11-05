@@ -100,14 +100,14 @@ export default function RouteDetailPage() {
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold tracking-tight">{route.name}</h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <h1 className="font-display truncate text-2xl font-bold tracking-tight">{route.name}</h1>
+          <p className="mt-1 text-sm text-muted">
             {modeLabel(route.type)} · {formatDistanceKm(route.distanceKm)}
             {route.travelTimeSeconds ? ` · ${formatDuration(route.travelTimeSeconds)}` : ''} · last checked{' '}
             {formatRelative(route.lastCheckedAt)}
           </p>
         </div>
-        <div className="w-full rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-2 sm:w-80">
+        <div className="w-full rounded-xl border border-line bg-surface/70 px-4 py-2 sm:w-80">
           <Toggle
             checked={Boolean(route.isActive)}
             disabled={togglingWatch}
@@ -134,7 +134,7 @@ export default function RouteDetailPage() {
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className="overflow-hidden rounded-2xl border border-slate-800">
+        <div className="overflow-hidden rounded-2xl border border-line">
           <div className="h-80">
             <BaseMap
               initialViewState={path.length > 1 ? { bounds: boundsOf(path), fitBoundsOptions: { padding: 40, maxZoom: 16 } } : undefined}
@@ -158,24 +158,24 @@ export default function RouteDetailPage() {
         </div>
 
         <Card>
-          <h2 className="text-sm font-semibold text-slate-300">Latest pollutant levels</h2>
+          <h2 className="text-sm font-semibold text-ink-2">Latest pollutant levels</h2>
           {latest ? (
             <>
               <dl className="mt-3 grid grid-cols-2 gap-3">
                 {POLLUTANTS.map((p) => (
-                  <div key={p.key} className="rounded-xl bg-slate-950/50 p-3">
-                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{p.label}</dt>
-                    <dd className="mt-1 text-xl font-bold tabular-nums text-slate-100">
+                  <div key={p.key} className="rounded-xl bg-canvas/50 p-3">
+                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-faint">{p.label}</dt>
+                    <dd className="mt-1 text-xl font-bold tabular-nums text-ink">
                       {latest[p.key] == null ? '–' : Math.round(latest[p.key])}
-                      <span className="ml-1 text-xs font-normal text-slate-500">µg/m³</span>
+                      <span className="ml-1 text-xs font-normal text-faint">µg/m³</span>
                     </dd>
                   </div>
                 ))}
               </dl>
-              <p className="mt-3 text-xs text-slate-500">Measured {formatDateTime(latest.timestamp)}, averaged along the route.</p>
+              <p className="mt-3 text-xs text-faint">Measured {formatDateTime(latest.timestamp)}, averaged along the route.</p>
             </>
           ) : (
-            <p className="mt-3 text-sm text-slate-500">No readings in this period yet.</p>
+            <p className="mt-3 text-sm text-faint">No readings in this period yet.</p>
           )}
         </Card>
       </div>
@@ -185,7 +185,7 @@ export default function RouteDetailPage() {
           <h2 id="history-heading" className="text-lg font-semibold">
             Air-quality history
           </h2>
-          <div role="radiogroup" aria-label="Period" className="flex rounded-lg border border-slate-800 bg-slate-900/60 p-1">
+          <div role="radiogroup" aria-label="Period" className="flex rounded-lg border border-line bg-surface/60 p-1">
             {PERIODS.map((p) => (
               <button
                 key={p.days}
@@ -194,7 +194,7 @@ export default function RouteDetailPage() {
                 aria-checked={days === p.days}
                 onClick={() => setDays(p.days)}
                 className={`min-h-8 rounded-md px-3 text-xs font-semibold transition-colors ${
-                  days === p.days ? 'bg-slate-800 text-slate-100' : 'text-slate-400 hover:text-slate-200'
+                  days === p.days ? 'bg-surface-2 text-ink' : 'text-muted hover:text-ink'
                 }`}
               >
                 {p.label}
@@ -217,15 +217,15 @@ export default function RouteDetailPage() {
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
-                <h3 className="text-sm font-semibold text-slate-300">Exposure score over time</h3>
-                <p className="mt-0.5 text-xs text-slate-500">Lower is cleaner. Alerts are sent above the dashed line.</p>
+                <h3 className="text-sm font-semibold text-ink-2">Exposure score over time</h3>
+                <p className="mt-0.5 text-xs text-faint">Lower is cleaner. Alerts are sent above the dashed line.</p>
                 <div className="mt-4">
                   <ScoreTrendChart points={points} days={days} />
                 </div>
               </Card>
               <Card>
-                <h3 className="text-sm font-semibold text-slate-300">Average by hour of day</h3>
-                <p className="mt-0.5 text-xs text-slate-500">In your time zone ({history.timeZone}).</p>
+                <h3 className="text-sm font-semibold text-ink-2">Average by hour of day</h3>
+                <p className="mt-0.5 text-xs text-faint">In your time zone ({history.timeZone}).</p>
                 <div className="mt-4">
                   <HourlyChart hourlyAverages={history.hourlyAverages} bestHour={bestHour} />
                 </div>
@@ -241,7 +241,7 @@ export default function RouteDetailPage() {
 
 function BackLink() {
   return (
-    <Link to="/routes" className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200">
+    <Link to="/routes" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-ink">
       <Icon name="back" className="h-4 w-4" /> My routes
     </Link>
   );
@@ -249,18 +249,18 @@ function BackLink() {
 
 function Stat({ label, value, children }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1.5 text-3xl font-black tabular-nums text-slate-100">{value}</p>
+    <div className="rounded-2xl border border-line bg-surface/70 p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">{label}</p>
+      <p className="mt-1.5 text-3xl font-data font-bold tabular-nums text-ink">{value}</p>
       <div className="mt-2 min-h-5">{children}</div>
     </div>
   );
 }
 
 function HourNote({ hour, averages }) {
-  if (hour == null) return <span className="text-xs text-slate-500">Needs more readings</span>;
+  if (hour == null) return <span className="text-xs text-faint">Needs more readings</span>;
   const score = averages?.[hour] ?? averages?.[String(hour)];
-  return <span className="text-xs text-slate-400">Average {formatScore(score)} · {scoreBand(score).label.toLowerCase()}</span>;
+  return <span className="text-xs text-muted">Average {formatScore(score)} · {scoreBand(score).label.toLowerCase()}</span>;
 }
 
 /** The same hourly numbers as a table, for screen readers and exact values. */
@@ -271,18 +271,18 @@ function HourlyTable({ averages }) {
   if (!rows.length) return null;
   return (
     <details className="mt-3 text-sm">
-      <summary className="cursor-pointer text-xs font-medium text-slate-400 hover:text-slate-200">Show as table</summary>
+      <summary className="cursor-pointer text-xs font-medium text-muted hover:text-ink">Show as table</summary>
       <table className="mt-2 w-full text-left text-xs">
         <thead>
-          <tr className="text-slate-500">
+          <tr className="text-faint">
             <th className="py-1 font-medium">Hour</th>
             <th className="py-1 font-medium">Average score</th>
             <th className="py-1 font-medium">Air quality</th>
           </tr>
         </thead>
-        <tbody className="text-slate-300">
+        <tbody className="text-ink-2">
           {rows.map(([hour, score]) => (
-            <tr key={hour} className="border-t border-slate-800">
+            <tr key={hour} className="border-t border-line">
               <td className="py-1">{formatHour(hour)}</td>
               <td className="py-1 tabular-nums">{formatScore(score)}</td>
               <td className="py-1">{scoreBand(score).label}</td>

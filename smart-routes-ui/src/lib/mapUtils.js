@@ -1,7 +1,25 @@
 import { scoreBand } from './format';
 
-/** Free vector map style from OpenFreeMap (no key, no usage limits). */
-export const MAP_STYLE = 'https://tiles.openfreemap.org/styles/dark';
+/**
+ * Free vector map styles from OpenFreeMap (no key, no usage limits), one per app theme,
+ * plus the colours that outline routes so they stand out on that map.
+ */
+export const MAP_THEMES = {
+  light: {
+    style: 'https://tiles.openfreemap.org/styles/positron',
+    casing: '#ffffff',
+    alt: '#7b8a9c',
+    altOpacity: 0.7,
+  },
+  dark: {
+    style: 'https://tiles.openfreemap.org/styles/dark',
+    casing: '#070b12',
+    alt: '#94a3b8',
+    altOpacity: 0.55,
+  },
+};
+
+export const mapTheme = (theme) => MAP_THEMES[theme] ?? MAP_THEMES.light;
 
 export const DEFAULT_VIEW = { longitude: 77.209, latitude: 28.6139, zoom: 12 }; // New Delhi
 

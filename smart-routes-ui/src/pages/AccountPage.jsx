@@ -14,7 +14,7 @@ const POLLUTANT_NOTES = {
 export default function AccountPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-bold tracking-tight">Account</h1>
+      <h1 className="font-display text-2xl font-bold tracking-tight">Account</h1>
       <ProfileSection />
       <SensitivitySection />
       <PasswordSection />
@@ -26,8 +26,8 @@ export default function AccountPage() {
 function SectionHeader({ title, children }) {
   return (
     <div className="mb-4">
-      <h2 className="text-base font-semibold text-slate-100">{title}</h2>
-      {children && <p className="mt-1 text-sm text-slate-400">{children}</p>}
+      <h2 className="text-base font-semibold text-ink">{title}</h2>
+      {children && <p className="mt-1 text-sm text-muted">{children}</p>}
     </div>
   );
 }
@@ -96,7 +96,7 @@ function SensitivitySection() {
       <SectionHeader title="Pollutant sensitivities">
         Routes with more of the pollutants you pick here are ranked lower, and their scores count those pollutants more heavily.
       </SectionHeader>
-      <div className="divide-y divide-slate-800">
+      <div className="divide-y divide-line">
         {POLLUTANTS.map((p) => (
           <div key={p.pref} className="py-2.5">
             <Toggle
@@ -217,9 +217,9 @@ function SessionSection() {
         Sign out everywhere
       </Button>
 
-      <div className="mt-6 border-t border-slate-800 pt-5">
-        <h3 className="text-sm font-semibold text-rose-300">Delete account</h3>
-        <p className="mt-1 text-sm text-slate-400">Permanently removes your account, saved routes, their history and your alerts. This cannot be undone.</p>
+      <div className="mt-6 border-t border-line pt-5">
+        <h3 className="text-sm font-semibold text-danger">Delete account</h3>
+        <p className="mt-1 text-sm text-muted">Permanently removes your account, saved routes, their history and your alerts. This cannot be undone.</p>
         {showDelete ? (
           <form onSubmit={destroy} className="mt-4 space-y-3">
             <TextField

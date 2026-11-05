@@ -26,16 +26,16 @@ export default function RoutesPage() {
     <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">My routes</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight">My routes</h1>
           {routes && routes.length > 0 && (
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-muted">
               {routes.length} saved · {watching} watched for poor air
             </p>
           )}
         </div>
         <Link
           to="/"
-          className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-emerald-500 px-4 text-sm font-semibold text-slate-950 hover:bg-emerald-400"
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-on-accent hover:bg-accent-hover"
         >
           <Icon name="map" className="h-4 w-4" /> Plan a new route
         </Link>
@@ -51,7 +51,7 @@ export default function RoutesPage() {
             icon="route"
             title="No saved routes yet"
             action={
-              <Link to="/" className="text-sm font-semibold text-emerald-400 hover:text-emerald-300">
+              <Link to="/" className="text-sm font-semibold text-accent-ink hover:text-accent-hover">
                 Plan your first route →
               </Link>
             }
@@ -118,9 +118,9 @@ function RouteCard({ route, onChange, onDelete }) {
   }
 
   return (
-    <article className="flex h-full flex-col rounded-2xl border border-slate-800 bg-slate-900/70 p-5">
+    <article className="flex h-full flex-col rounded-2xl border border-line bg-surface/70 p-5">
       <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-800 text-slate-300" title={modeLabel(route.type)}>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-ink-2" title={modeLabel(route.type)}>
           <Icon name={icon} className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
@@ -141,18 +141,18 @@ function RouteCard({ route, onChange, onDelete }) {
                     setName(route.name);
                   }
                 }}
-                className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none"
+                className="min-w-0 flex-1 rounded-md border border-line-strong bg-canvas px-2 py-1 text-sm text-ink focus:border-accent focus:outline-none"
               />
               <Button type="submit" className="min-h-8 px-3 py-1" loading={busy}>
                 Save
               </Button>
             </form>
           ) : (
-            <Link to={`/routes/${route.id}`} className="block truncate text-base font-semibold text-slate-100 hover:text-emerald-300">
+            <Link to={`/routes/${route.id}`} className="block truncate text-base font-semibold text-ink hover:text-accent-hover">
               {route.name}
             </Link>
           )}
-          <p className="mt-0.5 text-[13px] text-slate-400">
+          <p className="mt-0.5 text-[13px] text-muted">
             {modeLabel(route.type)} · {formatDistanceKm(route.distanceKm)}
             {route.travelTimeSeconds ? ` · ${formatDuration(route.travelTimeSeconds)}` : ''}
           </p>
@@ -160,21 +160,21 @@ function RouteCard({ route, onChange, onDelete }) {
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-xl bg-slate-950/50 p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Latest</p>
-          <p className="mt-1 text-2xl font-black tabular-nums">{formatScore(route.lastPollutionScore)}</p>
+        <div className="rounded-xl bg-canvas/50 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">Latest</p>
+          <p className="mt-1 text-2xl font-data font-bold tabular-nums">{formatScore(route.lastPollutionScore)}</p>
           <div className="mt-1.5">
             <BandChip score={route.lastPollutionScore} />
           </div>
         </div>
-        <div className="rounded-xl bg-slate-950/50 p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Average</p>
-          <p className="mt-1 text-2xl font-black tabular-nums">{formatScore(route.avgPollutionScore)}</p>
-          <p className="mt-2 text-[11px] text-slate-500">Checked {formatRelative(route.lastCheckedAt)}</p>
+        <div className="rounded-xl bg-canvas/50 p-3">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">Average</p>
+          <p className="mt-1 text-2xl font-data font-bold tabular-nums">{formatScore(route.avgPollutionScore)}</p>
+          <p className="mt-2 text-[11px] text-faint">Checked {formatRelative(route.lastCheckedAt)}</p>
         </div>
       </div>
 
-      <div className="mt-4 rounded-xl border border-slate-800 px-3 py-2">
+      <div className="mt-4 rounded-xl border border-line px-3 py-2">
         <Toggle
           checked={Boolean(route.isActive)}
           disabled={busy}
@@ -187,13 +187,13 @@ function RouteCard({ route, onChange, onDelete }) {
       <div className="mt-auto flex items-center justify-between gap-2 pt-4">
         <Link
           to={`/routes/${route.id}`}
-          className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-400 hover:text-emerald-300"
+          className="inline-flex items-center gap-1 text-sm font-semibold text-accent-ink hover:text-accent-hover"
         >
           History & best times <Icon name="chevron" className="h-4 w-4" />
         </Link>
         {confirmDelete ? (
           <div className="flex items-center gap-1">
-            <span className="mr-1 text-xs text-slate-400">Delete?</span>
+            <span className="mr-1 text-xs text-muted">Delete?</span>
             <Button variant="danger" className="min-h-8 px-3 py-1" loading={busy} onClick={destroy}>
               Delete
             </Button>
@@ -208,7 +208,7 @@ function RouteCard({ route, onChange, onDelete }) {
               onClick={() => setEditing(true)}
               aria-label={`Rename ${route.name}`}
               title="Rename"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-faint hover:bg-surface-2 hover:text-ink"
             >
               <Icon name="edit" className="h-4 w-4" />
             </button>
@@ -217,7 +217,7 @@ function RouteCard({ route, onChange, onDelete }) {
               onClick={() => setConfirmDelete(true)}
               aria-label={`Delete ${route.name}`}
               title="Delete"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-rose-950/60 hover:text-rose-300"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-faint hover:bg-danger/10 hover:text-danger"
             >
               <Icon name="trash" className="h-4 w-4" />
             </button>

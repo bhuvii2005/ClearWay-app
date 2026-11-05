@@ -82,13 +82,13 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
         {label}
       </label>
       <div
-        className={`flex items-center gap-2 rounded-lg border bg-slate-950/70 pl-2.5 pr-1 transition-colors ${
-          active ? 'border-emerald-500/70 ring-2 ring-emerald-500/15' : 'border-slate-700'
+        className={`flex items-center gap-2 rounded-lg border bg-surface pl-2.5 pr-1 transition-colors ${
+          active ? 'border-accent/70 ring-2 ring-accent/15' : 'border-line-strong'
         }`}
       >
         <span
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold text-slate-950 ${
-            marker === 'A' ? 'bg-emerald-400' : 'bg-sky-400'
+          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${
+            marker === 'A' ? 'bg-accent text-on-accent' : 'bg-haze text-on-haze'
           }`}
           aria-hidden="true"
         >
@@ -116,9 +116,9 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
             blurTimer.current = setTimeout(() => setOpen(false), 150);
           }}
           onKeyDown={onKeyDown}
-          className="h-10 min-w-0 flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+          className="h-10 min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint focus:outline-none"
         />
-        {loading && <Spinner className="h-4 w-4 shrink-0 text-slate-500" />}
+        {loading && <Spinner className="h-4 w-4 shrink-0 text-faint" />}
         {(value || query) && (
           <button
             type="button"
@@ -127,7 +127,7 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
               setQuery('');
               onClear();
             }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-faint hover:bg-surface-2 hover:text-ink-2"
           >
             <Icon name="x" className="h-4 w-4" />
           </button>
@@ -138,7 +138,7 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
         <ul
           id={listId}
           role="listbox"
-          className="absolute inset-x-0 top-full z-[1200] mt-1 max-h-72 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 py-1 shadow-2xl"
+          className="absolute inset-x-0 top-full z-[1200] mt-1 max-h-72 overflow-y-auto rounded-lg border border-line-strong bg-surface py-1 shadow-2xl"
         >
           {results.map((place, i) => (
             <li
@@ -148,17 +148,17 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => choose(place)}
               onMouseEnter={() => setHighlight(i)}
-              className={`flex cursor-pointer items-start gap-2.5 px-3 py-2 ${i === highlight ? 'bg-slate-800' : ''}`}
+              className={`flex cursor-pointer items-start gap-2.5 px-3 py-2 ${i === highlight ? 'bg-surface-2' : ''}`}
             >
-              <Icon name="pin" className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+              <Icon name="pin" className="mt-0.5 h-4 w-4 shrink-0 text-faint" />
               <span className="min-w-0">
-                <span className="block truncate text-sm text-slate-100">{place.name}</span>
-                {place.detail && <span className="block truncate text-xs text-slate-500">{place.detail}</span>}
+                <span className="block truncate text-sm text-ink">{place.name}</span>
+                {place.detail && <span className="block truncate text-xs text-faint">{place.detail}</span>}
               </span>
             </li>
           ))}
           {!loading && !results.length && (
-            <li className="px-3 py-2.5 text-sm text-slate-500">
+            <li className="px-3 py-2.5 text-sm text-faint">
               {failed ? 'Place search is unavailable right now. Click the map instead.' : 'No places found.'}
             </li>
           )}

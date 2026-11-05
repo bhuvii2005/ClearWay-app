@@ -1,8 +1,69 @@
 @import "tailwindcss";
 
-:root {
+/*
+ * Two themes share one set of colour names, so components never hard-code a shade:
+ *   light = "Clear Sky" (default), dark = "Night Air".
+ * The theme is chosen by data-theme on <html> (see lib/theme.js).
+ * Light values live in @theme; the dark block below overrides them.
+ */
+@theme {
+  --color-canvas: #f4f7fa; /* page background */
+  --color-surface: #ffffff; /* cards and panels */
+  --color-surface-2: #eef2f6; /* subtle fills, hover, selected */
+  --color-surface-3: #e3e9f0; /* stronger fills */
+  --color-line: #e3e9f0; /* borders */
+  --color-line-strong: #cbd5e1;
+  --color-ink: #0f1b2d; /* main text */
+  --color-ink-2: #2b3a50;
+  --color-muted: #4a5a70; /* secondary text */
+  --color-faint: #5e6b7e; /* hints and labels (still 4.5:1) */
+  --color-accent: #0369a1; /* sky: buttons, focus, links */
+  --color-accent-hover: #075985;
+  --color-accent-ink: #0369a1; /* accent used as text */
+  --color-on-accent: #ffffff;
+  --color-haze: #d97706; /* pollution / destination */
+  --color-on-haze: #1a1206;
+  --color-good: #15803d;
+  --color-warning: #b45309;
+  --color-danger: #b91c1c;
+  --color-danger-solid: #dc2626;
+
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Bricolage Grotesque Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-data: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root[data-theme="dark"] {
+  --color-canvas: #070b12;
+  --color-surface: #0d131d;
+  --color-surface-2: #141d2a;
+  --color-surface-3: #1c2736;
+  --color-line: #1e2a3a;
+  --color-line-strong: #2c3a4d;
+  --color-ink: #e6edf5;
+  --color-ink-2: #c3cdd9;
+  --color-muted: #9aa8ba;
+  --color-faint: #7d8a9c;
+  --color-accent: #5eead4; /* aurora */
+  --color-accent-hover: #99f6e4;
+  --color-accent-ink: #5eead4;
+  --color-on-accent: #04201b;
+  --color-haze: #ffb454;
+  --color-on-haze: #1a1206;
+  --color-good: #4ade80;
+  --color-warning: #fb923c;
+  --color-danger: #fb7185;
+  --color-danger-solid: #e11d48;
+
+  --font-display: "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-data: "JetBrains Mono Variable", ui-monospace, monospace;
   color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
   -webkit-font-smoothing: antialiased;
 }
 
@@ -11,49 +72,55 @@ body,
 #root {
   margin: 0;
   height: 100%;
-  background: #020617;
+  background: var(--color-canvas);
+  color: var(--color-ink);
 }
 
-/* MapLibre controls in the app's dark theme. */
+/* Big numbers line up in both themes. */
+.font-data {
+  font-variant-numeric: tabular-nums;
+}
+
+/* MapLibre controls in the app's colours. */
 .maplibregl-map {
-  background: #0b1120;
+  background: var(--color-surface-2);
   font-family: inherit;
 }
 
 .maplibregl-ctrl-group {
-  background: rgb(15 23 42 / 0.92) !important;
-  border: 1px solid #1e293b;
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent) !important;
+  border: 1px solid var(--color-line);
   border-radius: 12px !important;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35) !important;
+  box-shadow: 0 8px 24px rgb(15 27 45 / 0.14) !important;
   overflow: hidden;
 }
 
 .maplibregl-ctrl-group button + button {
-  border-top: 1px solid #1e293b !important;
+  border-top: 1px solid var(--color-line) !important;
 }
 
 .maplibregl-ctrl-group button:hover {
-  background-color: #1e293b !important;
+  background-color: var(--color-surface-2) !important;
 }
 
-/* The control icons are dark SVGs; flip them to light. */
-.maplibregl-ctrl-group .maplibregl-ctrl-icon {
+/* The control icons are dark SVGs; flip them to light on the dark theme. */
+[data-theme="dark"] .maplibregl-ctrl-group .maplibregl-ctrl-icon,
+[data-theme="dark"] .maplibregl-ctrl-attrib-button {
   filter: invert(0.85);
 }
 
 .maplibregl-ctrl-attrib,
 .maplibregl-ctrl-attrib.maplibregl-compact {
-  background: rgb(2 6 23 / 0.8) !important;
-  color: #64748b !important;
+  background: color-mix(in srgb, var(--color-surface) 85%, transparent) !important;
+  color: var(--color-faint) !important;
   font-size: 11px;
 }
 
 .maplibregl-ctrl-attrib a {
-  color: #94a3b8 !important;
+  color: var(--color-muted) !important;
 }
 
 .maplibregl-ctrl-attrib-button {
-  filter: invert(0.8);
   background-color: transparent !important;
 }
 
@@ -66,8 +133,8 @@ body,
   transform: rotate(-45deg);
   display: grid;
   place-items: center;
-  border: 3px solid #f8fafc;
-  box-shadow: 0 6px 16px rgb(0 0 0 / 0.45);
+  border: 3px solid var(--color-surface);
+  box-shadow: 0 6px 16px rgb(0 0 0 / 0.3);
   cursor: grab;
   margin-bottom: 6px;
 }
@@ -76,15 +143,16 @@ body,
   transform: rotate(45deg);
   font-weight: 800;
   font-size: 13px;
-  color: #020617;
 }
 
 .cw-pin--start {
-  background: #34d399;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .cw-pin--end {
-  background: #38bdf8;
+  background: var(--color-haze);
+  color: var(--color-on-haze);
 }
 
 /* Pulse dot centred on the pin's tip (the corner with no rounding, bottom-left before rotation). */
@@ -96,30 +164,23 @@ body,
   width: 10px;
   height: 10px;
   border-radius: 50%;
+  animation: pin-pulse 2s ease-out infinite;
 }
 
 .cw-pin--start::after {
-  background: rgb(52 211 153 / 0.5);
-  animation: pin-pulse 2s ease-out infinite;
+  background: color-mix(in srgb, var(--color-accent) 50%, transparent);
 }
 
 .cw-pin--end::after {
-  background: rgb(56 189 248 / 0.5);
-  animation: pin-pulse 2s ease-out infinite;
+  background: color-mix(in srgb, var(--color-haze) 50%, transparent);
 }
 
 @keyframes pin-pulse {
   from {
-    box-shadow: 0 0 0 0 rgb(248 250 252 / 0.45);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-ink) 35%, transparent);
   }
   to {
-    box-shadow: 0 0 0 14px rgb(248 250 252 / 0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cw-pin::after {
-    animation: none;
+    box-shadow: 0 0 0 14px transparent;
   }
 }
 
@@ -139,6 +200,7 @@ body,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cw-pin::after,
   .toast-in {
     animation: none;
   }

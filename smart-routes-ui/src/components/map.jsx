@@ -1,19 +1,21 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Map, { Layer, Marker, NavigationControl, Source, useMap } from 'react-map-gl/maplibre';
 import { setWorkerUrl } from 'maplibre-gl';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
-import { MAP_STYLE, DEFAULT_VIEW, airStops, boundsOf, gradientExpression, prefersReducedMotion } from '../lib/mapUtils';
+import { DEFAULT_VIEW, mapTheme, airStops, boundsOf, gradientExpression, prefersReducedMotion } from '../lib/mapUtils';
 import { scoreBand } from '../lib/format';
+import { useTheme } from '../context/contexts';
 
 // MapLibre 6 runs tile decoding in a separate worker file; tell it where the build put that file.
 setWorkerUrl(workerUrl);
 
-/** Vector base map (MapLibre GL + OpenFreeMap). Extra props go to react-map-gl's Map. */
+/** Vector base map (MapLibre GL + OpenFreeMap) in the app's theme. Extra props go to react-map-gl's Map. */
 export function BaseMap({ children, initialViewState = DEFAULT_VIEW, ...props }) {
+  const { theme } = useTheme();
   return (
     <Map
       initialViewState={initialViewState}
-      mapStyle={MAP_STYLE}
+      mapStyle={mapTheme(theme).style}
       style={{ width: '100%', height: '100%' }}
       attributionControl={{ compact: true }}
       dragRotate
@@ -66,11 +68,13 @@ export function Pin({ kind, longitude, latitude, ...props }) {
 }
 
 /**
- * The chosen route: a soft glow, a dark casing, and a line coloured by the air along it
+ * The chosen route: a soft glow, an outline, and a line coloured by the air along it
  * (green = clean, red = poor). It draws itself from A to B when `animateKey` changes.
  */
 export function AirRoute({ id = 'route', coords, samples, score, animateKey, width = 6 }) {
   const { current: map } = useMap();
+  const { theme } = useTheme();
+  const colors = mapTheme(theme);
   const stops = useMemo(() => airStops(coords, samples, score), [coords, samples, score]);
   const animate = !prefersReducedMotion();
   const data = useMemo(
@@ -80,11 +84,14 @@ export function AirRoute({ id = 'route', coords, samples, score, animateKey, wid
   const glowColor = scoreBand(score).color;
   const lineId = `${id}-line`;
 
-  // Paint is fixed per route so React re-renders never undo the animation below.
-  const linePaint = useMemo(
-    () => ({ 'line-width': width, 'line-gradient': gradientExpression(stops, animate ? 0 : 1) }),
-    [stops, width, animate],
-  );
+  // How much of the route is drawn (0 to 1). Kept in state, so if the map style is swapped
+  // (theme change) the re-added layer comes back at the right point.
+  const [reveal, setReveal] = useState(animate ? 0 : 1);
+  const [shown, setShown] = useState({ stops, animateKey });
+  if (shown.stops !== stops || shown.animateKey !== animateKey) {
+    setShown({ stops, animateKey });
+    setReveal(animate ? 0 : 1);
+  }
 
   useEffect(() => {
     if (!map || !animate) return;
@@ -99,14 +106,17 @@ export function AirRoute({ id = 'route', coords, samples, score, animateKey, wid
       }
       start ??= now;
       const t = Math.min(1, (now - start) / duration);
-      const eased = 1 - Math.pow(1 - t, 3);
-      gl.setPaintProperty(lineId, 'line-gradient', gradientExpression(stops, eased));
+      setReveal(1 - Math.pow(1 - t, 3)); // ease out
       if (t < 1) frame = requestAnimationFrame(step);
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, stops, animateKey]);
+  }, [map, stops, animateKey, animate, lineId]);
+
+  const linePaint = useMemo(
+    () => ({ 'line-width': width, 'line-gradient': gradientExpression(stops, reveal) }),
+    [stops, width, reveal],
+  );
 
   return (
     <Source id={id} type="geojson" data={data} lineMetrics>
@@ -114,13 +124,13 @@ export function AirRoute({ id = 'route', coords, samples, score, animateKey, wid
         id={`${id}-glow`}
         type="line"
         layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-        paint={{ 'line-color': glowColor, 'line-width': width * 4, 'line-opacity': 0.18, 'line-blur': width * 2 }}
+        paint={{ 'line-color': glowColor, 'line-width': width * 4, 'line-opacity': 0.2, 'line-blur': width * 2 }}
       />
       <Layer
         id={`${id}-casing`}
         type="line"
         layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-        paint={{ 'line-color': '#020617', 'line-width': width + 4, 'line-opacity': 0.9 }}
+        paint={{ 'line-color': colors.casing, 'line-width': width + 4, 'line-opacity': 0.95 }}
       />
       <Layer id={lineId} type="line" layout={{ 'line-cap': 'round', 'line-join': 'round' }} paint={linePaint} />
     </Source>
@@ -129,6 +139,8 @@ export function AirRoute({ id = 'route', coords, samples, score, animateKey, wid
 
 /** Routes that are not selected: quiet grey lines that can be clicked (layer id "alt-routes"). */
 export function OtherRoutes({ routes, selected }) {
+  const { theme } = useTheme();
+  const colors = mapTheme(theme);
   const data = useMemo(
     () => ({
       type: 'FeatureCollection',
@@ -148,13 +160,13 @@ export function OtherRoutes({ routes, selected }) {
         id="alt-routes-casing"
         type="line"
         layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-        paint={{ 'line-color': '#020617', 'line-width': 9, 'line-opacity': 0.6 }}
+        paint={{ 'line-color': colors.casing, 'line-width': 9, 'line-opacity': 0.8 }}
       />
       <Layer
         id="alt-routes"
         type="line"
         layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-        paint={{ 'line-color': '#94a3b8', 'line-width': 5, 'line-opacity': 0.55 }}
+        paint={{ 'line-color': colors.alt, 'line-width': 5, 'line-opacity': colors.altOpacity }}
       />
     </Source>
   );

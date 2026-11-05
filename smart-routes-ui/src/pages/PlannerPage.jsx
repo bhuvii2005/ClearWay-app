@@ -221,10 +221,10 @@ export default function PlannerPage() {
 
       <aside
         aria-label="Route planner"
-        className="absolute inset-x-0 bottom-0 z-10 max-h-[58%] overflow-y-auto rounded-t-2xl border-t border-slate-800 bg-slate-950/95 p-4 shadow-2xl backdrop-blur lg:inset-x-auto lg:bottom-4 lg:left-4 lg:top-4 lg:max-h-none lg:w-[410px] lg:rounded-2xl lg:border lg:p-5"
+        className="absolute inset-x-0 bottom-0 z-10 max-h-[58%] overflow-y-auto rounded-t-2xl border-t border-line bg-canvas/95 p-4 shadow-2xl backdrop-blur lg:inset-x-auto lg:bottom-4 lg:left-4 lg:top-4 lg:max-h-none lg:w-[410px] lg:rounded-2xl lg:border lg:p-5"
       >
-        <h1 className="text-lg font-bold tracking-tight">Find a cleaner route</h1>
-        <p className="mt-0.5 text-[13px] text-slate-400">Routes are ranked by the air along the way.</p>
+        <h1 className="font-display text-lg font-bold tracking-tight">Find a cleaner route</h1>
+        <p className="mt-0.5 text-[13px] text-muted">Routes are ranked by the air along the way.</p>
 
         <div className="mt-4 flex gap-2">
           <div className="min-w-0 flex-1 space-y-2">
@@ -267,7 +267,7 @@ export default function PlannerPage() {
               disabled={locating}
               title="Use my location as the start"
               aria-label="Use my location as the start"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-50"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-line-strong text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-50"
             >
               <Icon name="locate" className="h-[18px] w-[18px]" />
             </button>
@@ -277,26 +277,26 @@ export default function PlannerPage() {
               disabled={!origin && !destination}
               title="Swap start and destination"
               aria-label="Swap start and destination"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:opacity-40"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-line-strong text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-40"
             >
               <Icon name="swap" className="h-[18px] w-[18px] rotate-90" />
             </button>
           </div>
         </div>
 
-        {nextHint && <p className="mt-2 text-xs text-slate-500">{nextHint}</p>}
+        {nextHint && <p className="mt-2 text-xs text-faint">{nextHint}</p>}
         {origin && destination && !routes.length && (
-          <p className="mt-2 text-xs text-slate-500">Clicking the map now moves the highlighted point. You can also drag the pins.</p>
+          <p className="mt-2 text-xs text-faint">Clicking the map now moves the highlighted point. You can also drag the pins.</p>
         )}
 
         <fieldset className="mt-4">
           <legend className="sr-only">Travel mode</legend>
-          <div className="grid grid-cols-4 gap-1 rounded-lg border border-slate-800 bg-slate-900/60 p-1">
+          <div className="grid grid-cols-4 gap-1 rounded-lg border border-line bg-surface/60 p-1">
             {MODES.map((m) => (
               <label
                 key={m.id}
-                className={`flex h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md text-xs font-semibold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-emerald-400 ${
-                  mode === m.id ? 'bg-slate-800 text-emerald-300' : 'text-slate-400 hover:text-slate-200'
+                className={`flex h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md text-xs font-semibold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+                  mode === m.id ? 'bg-surface-2 text-accent-ink' : 'text-muted hover:text-ink'
                 }`}
               >
                 <input
@@ -321,7 +321,7 @@ export default function PlannerPage() {
           {searching ? 'Checking the air on each route…' : 'Compare routes'}
         </Button>
 
-        <p className="mt-2.5 text-xs text-slate-500">
+        <p className="mt-2.5 text-xs text-faint">
           {sensitivities.length ? (
             <>
               Weighted for your sensitivity to {sensitivities.map((s) => s.label).join(', ')}.{' '}
@@ -329,7 +329,7 @@ export default function PlannerPage() {
           ) : (
             'Sensitive to a particular pollutant? '
           )}
-          <Link to="/account" className="font-medium text-slate-400 underline decoration-slate-600 underline-offset-2 hover:text-slate-200">
+          <Link to="/account" className="font-medium text-muted underline decoration-line-strong underline-offset-2 hover:text-ink">
             {sensitivities.length ? 'Change' : 'Set it in your account'}
           </Link>
         </p>
@@ -341,8 +341,8 @@ export default function PlannerPage() {
         )}
 
         {routes.length > 0 && (
-          <section aria-label="Route options" className="mt-5 border-t border-slate-800 pt-4">
-            <h2 className="mb-3 text-sm font-semibold text-slate-300">
+          <section aria-label="Route options" className="mt-5 border-t border-line pt-4">
+            <h2 className="mb-3 text-sm font-semibold text-ink-2">
               {routes.length} {routes.length === 1 ? 'option' : 'options'} · {modeLabel(mode).toLowerCase()}
             </h2>
             <ol className="space-y-2">
@@ -409,51 +409,51 @@ function RouteOption({ route, rank, selected, onSelect, defaultName, mode, onSav
   return (
     <div
       className={`rounded-xl border transition-colors ${
-        selected ? 'border-slate-500 bg-slate-900' : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'
+        selected ? 'border-accent bg-surface shadow-md ring-1 ring-accent/30' : 'border-line bg-surface/70 hover:border-line-strong'
       }`}
     >
       <button type="button" onClick={onSelect} aria-pressed={selected} className="w-full p-3.5 text-left">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-sm font-semibold text-slate-100">{rank === 0 ? 'Cleanest' : `Option ${rank + 1}`}</span>
+              <span className="text-sm font-semibold text-ink">{rank === 0 ? 'Cleanest' : `Option ${rank + 1}`}</span>
               {route.fastest && (
-                <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] font-semibold text-slate-300">Fastest</span>
+                <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-2">Fastest</span>
               )}
             </div>
-            <p className="mt-0.5 text-[13px] text-slate-400">
+            <p className="mt-0.5 text-[13px] text-muted">
               {formatDuration(route.travelTimeSeconds)} · {formatDistanceMeters(route.distanceMeters)}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-black tabular-nums leading-none text-slate-100">{Math.round(route.pollutionScore)}</p>
-            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">exposure</p>
+            <p className="text-2xl font-data font-bold tabular-nums leading-none text-ink">{Math.round(route.pollutionScore)}</p>
+            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-faint">exposure</p>
           </div>
         </div>
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <BandChip score={route.pollutionScore} />
-          <span className="text-xs text-slate-400">{exposureText(route)}</span>
+          <span className="text-xs text-muted">{exposureText(route)}</span>
         </div>
       </button>
 
       {selected && (
-        <div className="border-t border-slate-800 px-3.5 pb-3.5 pt-3">
+        <div className="border-t border-line px-3.5 pb-3.5 pt-3">
           {data && (
             <dl className="grid grid-cols-4 gap-2 text-center">
               {POLLUTANTS.map((p) => (
-                <div key={p.key} className="rounded-lg bg-slate-950/60 py-1.5">
-                  <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{p.label}</dt>
-                  <dd className="text-sm font-semibold tabular-nums text-slate-200">{Math.round(data[p.key] ?? 0)}</dd>
+                <div key={p.key} className="rounded-lg bg-canvas/60 py-1.5">
+                  <dt className="text-[10px] font-semibold uppercase tracking-wide text-faint">{p.label}</dt>
+                  <dd className="text-sm font-semibold tabular-nums text-ink">{Math.round(data[p.key] ?? 0)}</dd>
                 </div>
               ))}
             </dl>
           )}
-          {data && <p className="mt-1.5 text-[11px] text-slate-500">Average along the route, µg/m³.</p>}
+          {data && <p className="mt-1.5 text-[11px] text-faint">Average along the route, µg/m³.</p>}
 
           {savedId ? (
             <Link
               to={`/routes/${savedId}`}
-              className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 py-2 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/15"
+              className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-accent/40 bg-accent/10 py-2 text-sm font-semibold text-accent-ink hover:bg-accent/15"
             >
               <Icon name="check" className="h-4 w-4" /> Saved · open route
             </Link>

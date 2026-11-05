@@ -5,6 +5,7 @@ import { errorMessage } from '../lib/api';
 import { Button, ErrorNote, TextField } from '../components/ui';
 import { Logo } from '../components/Layout';
 import Icon from '../components/Icon';
+import ThemeSwitch from '../components/ThemeSwitch';
 
 const POINTS = [
   { icon: 'route', text: 'Compare routes by the air you will actually breathe, not just by time.' },
@@ -47,17 +48,17 @@ export default function AuthPage({ mode }) {
   }
 
   return (
-    <div className="grid min-h-dvh bg-slate-950 text-slate-100 lg:grid-cols-[1fr_minmax(420px,520px)]">
-      <aside className="relative hidden overflow-hidden border-r border-slate-800 bg-gradient-to-br from-emerald-950/60 via-slate-950 to-slate-950 p-12 lg:flex lg:flex-col lg:justify-between">
+    <div className="grid min-h-dvh bg-canvas text-ink lg:grid-cols-[1fr_minmax(420px,520px)]">
+      <aside className="relative hidden overflow-hidden border-r border-line bg-gradient-to-br from-accent/10 via-canvas to-canvas p-12 lg:flex lg:flex-col lg:justify-between">
         <Logo className="text-xl" />
         <div className="max-w-md">
-          <h1 className="text-4xl font-extrabold leading-tight tracking-tight">
-            The cleanest way there, <span className="text-emerald-400">not just the fastest.</span>
+          <h1 className="font-display text-4xl font-extrabold leading-tight tracking-tight">
+            The cleanest way there, <span className="text-accent-ink">not just the fastest.</span>
           </h1>
           <ul className="mt-10 space-y-5">
             {POINTS.map((p) => (
-              <li key={p.icon} className="flex gap-3 text-slate-300">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+              <li key={p.icon} className="flex gap-3 text-ink-2">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-accent/30 bg-accent/10 text-accent-ink">
                   <Icon name={p.icon} className="h-5 w-5" />
                 </span>
                 <span className="pt-1.5 text-[15px] leading-snug">{p.text}</span>
@@ -65,14 +66,17 @@ export default function AuthPage({ mode }) {
             ))}
           </ul>
         </div>
-        <p className="text-xs text-slate-500">Air-quality data: Open-Meteo · Routing: TomTom · Maps: OpenStreetMap</p>
+        <p className="text-xs text-faint">Air-quality data: Open-Meteo · Routing: TomTom · Maps: OpenFreeMap, OpenStreetMap</p>
       </aside>
 
-      <div className="flex items-center justify-center px-4 py-12 sm:px-10">
+      <div className="relative flex items-center justify-center px-4 py-12 sm:px-10">
+        <div className="absolute right-4 top-4">
+          <ThemeSwitch />
+        </div>
         <div className="w-full max-w-sm">
           <Logo className="mb-10 text-xl lg:hidden" />
-          <h2 className="text-2xl font-bold tracking-tight">{isSignup ? 'Create your account' : 'Welcome back'}</h2>
-          <p className="mt-1.5 text-sm text-slate-400">
+          <h2 className="font-display text-2xl font-bold tracking-tight">{isSignup ? 'Create your account' : 'Welcome back'}</h2>
+          <p className="mt-1.5 text-sm text-muted">
             {isSignup ? 'Start finding cleaner routes in under a minute.' : 'Sign in to plan routes and see your alerts.'}
           </p>
 
@@ -107,9 +111,9 @@ export default function AuthPage({ mode }) {
             </Button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-400">
+          <p className="mt-6 text-center text-sm text-muted">
             {isSignup ? 'Already have an account? ' : 'New to ClearWay? '}
-            <Link to={isSignup ? '/login' : '/signup'} className="font-semibold text-emerald-400 hover:text-emerald-300">
+            <Link to={isSignup ? '/login' : '/signup'} className="font-semibold text-accent-ink hover:text-accent-hover">
               {isSignup ? 'Sign in' : 'Create an account'}
             </Link>
           </p>

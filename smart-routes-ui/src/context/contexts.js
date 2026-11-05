@@ -13,3 +13,5 @@ function useRequired(context, name) {
 export const useAuth = () => useRequired(AuthContext, 'useAuth');
 export const useToast = () => useRequired(ToastContext, 'useToast');
 export const useAlerts = () => useRequired(AlertsContext, 'useAlerts');
+export const ThemeContext = createContext(null);
+export const useTheme = () => useRequired(ThemeContext, 'useTheme');

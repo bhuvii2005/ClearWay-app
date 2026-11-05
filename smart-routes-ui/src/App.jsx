@@ -18,7 +18,7 @@ function RequireAuth({ children }) {
   const location = useLocation();
   if (status === 'loading') {
     return (
-      <div className="h-dvh bg-slate-950">
+      <div className="h-dvh bg-canvas">
         <PageLoader label="Signing you in…" />
       </div>
     );

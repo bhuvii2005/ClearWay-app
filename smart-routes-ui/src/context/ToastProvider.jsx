@@ -4,11 +4,11 @@ import { ToastContext } from './contexts';
 import Icon from '../components/Icon';
 
 const TONES = {
-  success: { icon: 'check', ring: 'border-emerald-500/40', iconColor: 'text-emerald-400' },
-  error: { icon: 'alert', ring: 'border-rose-500/40', iconColor: 'text-rose-400' },
-  info: { icon: 'info', ring: 'border-sky-500/40', iconColor: 'text-sky-400' },
-  poor: { icon: 'wind', ring: 'border-orange-500/50', iconColor: 'text-orange-400' },
-  clean: { icon: 'leaf', ring: 'border-emerald-500/50', iconColor: 'text-emerald-400' },
+  success: { icon: 'check', ring: 'border-accent/40', iconColor: 'text-accent-ink' },
+  error: { icon: 'alert', ring: 'border-danger/40', iconColor: 'text-danger' },
+  info: { icon: 'info', ring: 'border-accent/40', iconColor: 'text-accent-ink' },
+  poor: { icon: 'wind', ring: 'border-warning/50', iconColor: 'text-warning' },
+  clean: { icon: 'leaf', ring: 'border-accent/50', iconColor: 'text-accent-ink' },
 };
 
 /** Small messages in the corner: confirmations, errors and live air alerts. */
@@ -45,17 +45,17 @@ export default function ToastProvider({ children }) {
             <div
               key={toast.id}
               role="status"
-              className={`toast-in pointer-events-auto flex w-full max-w-sm gap-3 rounded-xl border bg-slate-900/95 p-3.5 shadow-2xl backdrop-blur ${tone.ring}`}
+              className={`toast-in pointer-events-auto flex w-full max-w-sm gap-3 rounded-xl border bg-surface/95 p-3.5 shadow-2xl backdrop-blur ${tone.ring}`}
             >
               <Icon name={tone.icon} className={`mt-0.5 h-5 w-5 shrink-0 ${tone.iconColor}`} />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-slate-100">{toast.title}</p>
-                {toast.body && <p className="mt-0.5 text-[13px] leading-snug text-slate-400">{toast.body}</p>}
+                <p className="text-sm font-semibold text-ink">{toast.title}</p>
+                {toast.body && <p className="mt-0.5 text-[13px] leading-snug text-muted">{toast.body}</p>}
                 {toast.link && (
                   <Link
                     to={toast.link.to}
                     onClick={() => dismiss(toast.id)}
-                    className="mt-1.5 inline-block text-[13px] font-semibold text-emerald-400 hover:text-emerald-300"
+                    className="mt-1.5 inline-block text-[13px] font-semibold text-accent-ink hover:text-accent-hover"
                   >
                     {toast.link.label}
                   </Link>
@@ -65,7 +65,7 @@ export default function ToastProvider({ children }) {
                 type="button"
                 onClick={() => dismiss(toast.id)}
                 aria-label="Dismiss"
-                className="-m-1 h-7 w-7 shrink-0 rounded-md p-1 text-slate-500 hover:bg-slate-800 hover:text-slate-300"
+                className="-m-1 h-7 w-7 shrink-0 rounded-md p-1 text-faint hover:bg-surface-2 hover:text-ink-2"
               >
                 <Icon name="x" className="h-5 w-5" />
               </button>

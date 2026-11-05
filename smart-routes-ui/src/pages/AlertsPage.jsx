@@ -58,9 +58,9 @@ export default function AlertsPage() {
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Alerts</h1>
-          <p className="mt-1 flex items-center gap-2 text-sm text-slate-400">
-            <span className={`h-2 w-2 rounded-full ${connected ? 'bg-emerald-400' : 'bg-slate-600'}`} aria-hidden="true" />
+          <h1 className="font-display text-2xl font-bold tracking-tight">Alerts</h1>
+          <p className="mt-1 flex items-center gap-2 text-sm text-muted">
+            <span className={`h-2 w-2 rounded-full ${connected ? 'bg-accent' : 'bg-line-strong'}`} aria-hidden="true" />
             {connected ? 'Live: new alerts appear instantly' : 'Reconnecting to live alerts…'}
           </p>
         </div>
@@ -100,33 +100,33 @@ function AlertRow({ alert, onOpen }) {
   return (
     <article
       className={`flex gap-3.5 rounded-xl border p-4 transition-colors ${
-        alert.read ? 'border-slate-800 bg-slate-900/40' : 'border-slate-700 bg-slate-900'
+        alert.read ? 'border-line bg-surface/40' : 'border-line-strong bg-surface'
       }`}
     >
       <span
         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-          poor ? 'bg-orange-500/15 text-orange-400' : 'bg-emerald-500/15 text-emerald-400'
+          poor ? 'bg-warning/15 text-warning' : 'bg-accent/15 text-accent-ink'
         }`}
       >
         <Icon name={poor ? 'wind' : 'leaf'} className="h-5 w-5" />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h2 className="text-sm font-semibold text-slate-100">{poor ? 'Poor air' : 'Cleaner air'}</h2>
-          {alert.routeName && <span className="truncate text-sm text-slate-400">on {alert.routeName}</span>}
+          <h2 className="text-sm font-semibold text-ink">{poor ? 'Poor air' : 'Cleaner air'}</h2>
+          {alert.routeName && <span className="truncate text-sm text-muted">on {alert.routeName}</span>}
           {!alert.read && (
-            <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-300">New</span>
+            <span className="rounded-full bg-danger-solid/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-danger">New</span>
           )}
         </div>
-        <p className="mt-1 text-sm leading-snug text-slate-300">{alert.message}</p>
+        <p className="mt-1 text-sm leading-snug text-ink-2">{alert.message}</p>
         <div className="mt-2.5 flex flex-wrap items-center gap-3">
           {alert.pollutionScore != null && (
-            <span className="flex items-center gap-2 text-xs text-slate-400">
-              Score <span className="font-semibold tabular-nums text-slate-200">{formatScore(alert.pollutionScore)}</span>
+            <span className="flex items-center gap-2 text-xs text-muted">
+              Score <span className="font-semibold tabular-nums text-ink">{formatScore(alert.pollutionScore)}</span>
               <BandChip score={alert.pollutionScore} />
             </span>
           )}
-          <time dateTime={alert.createdAt} title={formatDateTime(alert.createdAt)} className="text-xs text-slate-500">
+          <time dateTime={alert.createdAt} title={formatDateTime(alert.createdAt)} className="text-xs text-faint">
             {formatRelative(alert.createdAt)}
           </time>
         </div>
@@ -136,13 +136,13 @@ function AlertRow({ alert, onOpen }) {
           <Link
             to={`/routes/${alert.routeId}`}
             onClick={onOpen}
-            className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-400 hover:text-emerald-300"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-accent-ink hover:text-accent-hover"
           >
             View <Icon name="chevron" className="h-4 w-4" />
           </Link>
         )}
         {!alert.read && (
-          <button type="button" onClick={onOpen} className="text-xs text-slate-500 hover:text-slate-300">
+          <button type="button" onClick={onOpen} className="text-xs text-faint hover:text-ink-2">
             Mark read
           </button>
         )}

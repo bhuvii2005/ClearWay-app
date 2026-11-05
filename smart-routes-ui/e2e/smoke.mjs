@@ -25,6 +25,11 @@ page.on('response', (r) => {
 });
 
 const shot = (name) => page.screenshot({ path: path.join(OUT, `${name}.png`) });
+/** Flip the light/dark switch and wait for the map to restyle. */
+const flipTheme = async () => {
+  await page.getByRole('switch', { name: 'Dark theme' }).click();
+  await page.waitForTimeout(2500);
+};
 const step = (s) => console.log('-', s);
 
 step('redirect to login');
@@ -61,6 +66,13 @@ await page.getByRole('heading', { name: /option/ }).waitFor({ timeout: 30000 });
 await page.waitForTimeout(1500);
 await shot('04-results');
 
+step('dark theme keeps the route');
+await flipTheme();
+if ((await page.locator('html').getAttribute('data-theme')) !== 'dark') problems.push('theme switch did not apply dark');
+await shot('04b-results-dark');
+await flipTheme();
+await shot('04c-results-light-again');
+
 step('select second option');
 const optionButtons = page.locator('section[aria-label="Route options"] li > div > button');
 if ((await optionButtons.count()) > 1) {
@@ -87,6 +99,12 @@ await page.getByRole('link', { name: /History & best times/ }).first().click();
 await page.getByText('Air-quality history').waitFor();
 await page.waitForTimeout(2000);
 await shot('07-detail');
+await flipTheme();
+await shot('07b-detail-dark');
+await page.reload(); // the choice should survive a reload
+await page.getByText('Air-quality history').waitFor();
+if ((await page.locator('html').getAttribute('data-theme')) !== 'dark') problems.push('dark theme not remembered after reload');
+await flipTheme();
 
 step('alerts');
 await page.goto(BASE + '/alerts');
@@ -106,6 +124,9 @@ await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(BASE + '/');
 await page.waitForTimeout(1500);
 await shot('10-mobile');
+await flipTheme();
+await shot('10b-mobile-dark');
+await flipTheme();
 await page.goto(BASE + '/routes');
 await page.waitForTimeout(1000);
 await shot('11-mobile-routes');
