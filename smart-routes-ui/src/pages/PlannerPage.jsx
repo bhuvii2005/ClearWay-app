@@ -9,12 +9,14 @@ import {
   formatDistanceMeters,
   formatDuration,
   modeLabel,
+  tradeOff,
+  whoComparison,
 } from '../lib/format';
 import { useAuth, useToast } from '../context/contexts';
 import { AirRoute, BaseMap, FitBounds, OtherRoutes, Pin } from '../components/map';
 import PlaceSearch from '../components/PlaceSearch';
 import Icon from '../components/Icon';
-import { BandChip, Button, ErrorNote, TextField, Toggle } from '../components/ui';
+import { AirRing, BandChip, Button, ErrorNote, PollutantReading, TextField, Toggle } from '../components/ui';
 
 const MAX_SAVED_POINTS = 10000;
 const ALT_LAYERS = ['alt-routes'];
@@ -351,6 +353,7 @@ export default function PlannerPage() {
                   <RouteOption
                     route={route}
                     rank={i}
+                    fastest={routes.find((r) => r.fastest)}
                     selected={i === selected}
                     onSelect={() => setSelected(i)}
                     defaultName={`${shortName(origin)} to ${shortName(destination)}`}
@@ -374,7 +377,7 @@ export default function PlannerPage() {
   );
 }
 
-function RouteOption({ route, rank, selected, onSelect, defaultName, mode, onSaved }) {
+function RouteOption({ route, rank, fastest, selected, onSelect, defaultName, mode, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState(defaultName.slice(0, 100));
   const [monitor, setMonitor] = useState(true);
@@ -382,6 +385,7 @@ function RouteOption({ route, rank, selected, onSelect, defaultName, mode, onSav
   const [error, setError] = useState('');
   const [savedId, setSavedId] = useState(null);
   const data = route.pollutionData;
+  const trade = tradeOff(route, fastest);
 
   async function save(e) {
     e.preventDefault();
@@ -425,30 +429,46 @@ function RouteOption({ route, rank, selected, onSelect, defaultName, mode, onSav
               {formatDuration(route.travelTimeSeconds)} · {formatDistanceMeters(route.distanceMeters)}
             </p>
           </div>
-          <div className="text-right">
-            <p className="text-2xl font-data font-bold tabular-nums leading-none text-ink">{Math.round(route.pollutionScore)}</p>
-            <p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-faint">exposure</p>
-          </div>
+          <AirRing score={route.pollutionScore} label="Exposure score" />
         </div>
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <BandChip score={route.pollutionScore} />
           <span className="text-xs text-muted">{exposureText(route)}</span>
         </div>
+        {(trade.time || trade.pm25) && (
+          <p className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold">
+            {trade.time && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-2 py-0.5 text-ink-2">
+                <Icon name="clock" className="h-3.5 w-3.5" /> {trade.time} <span className="font-normal text-muted">vs fastest</span>
+              </span>
+            )}
+            {trade.pm25 && (
+              <span
+                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${
+                  trade.pm25.includes('less') ? 'bg-good/10 text-good' : 'bg-warning/10 text-warning'
+                }`}
+              >
+                <Icon name="leaf" className="h-3.5 w-3.5" /> {trade.pm25}
+              </span>
+            )}
+          </p>
+        )}
       </button>
 
       {selected && (
         <div className="border-t border-line px-3.5 pb-3.5 pt-3">
           {data && (
-            <dl className="grid grid-cols-4 gap-2 text-center">
+            <dl className="grid grid-cols-2 gap-2">
               {POLLUTANTS.map((p) => (
-                <div key={p.key} className="rounded-lg bg-canvas/60 py-1.5">
-                  <dt className="text-[10px] font-semibold uppercase tracking-wide text-faint">{p.label}</dt>
-                  <dd className="text-sm font-semibold tabular-nums text-ink">{Math.round(data[p.key] ?? 0)}</dd>
-                </div>
+                <PollutantReading key={p.key} label={p.label} value={data[p.key]} who={whoComparison(p.key, data[p.key])} />
               ))}
             </dl>
           )}
-          {data && <p className="mt-1.5 text-[11px] text-faint">Average along the route, µg/m³.</p>}
+          {data && (
+            <p className="mt-1.5 text-[11px] text-faint">
+              Average along the route now. The tick marks the WHO guideline.
+            </p>
+          )}
 
           {savedId ? (
             <Link

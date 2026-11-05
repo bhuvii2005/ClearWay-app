@@ -4,7 +4,7 @@ import { routesApi, errorMessage } from '../lib/api';
 import { formatDistanceKm, formatDuration, formatRelative, formatScore, modeLabel, MODES } from '../lib/format';
 import { useToast } from '../context/contexts';
 import Icon from '../components/Icon';
-import { BandChip, Button, EmptyState, ErrorNote, PageLoader, Toggle } from '../components/ui';
+import { AirRing, BandChip, Button, EmptyState, ErrorNote, PageLoader, Toggle } from '../components/ui';
 
 export default function RoutesPage() {
   const [routes, setRoutes] = useState(null);
@@ -161,10 +161,14 @@ function RouteCard({ route, onChange, onDelete }) {
 
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-xl bg-canvas/50 p-3">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">Latest</p>
-          <p className="mt-1 text-2xl font-data font-bold tabular-nums">{formatScore(route.lastPollutionScore)}</p>
-          <div className="mt-1.5">
-            <BandChip score={route.lastPollutionScore} />
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">Latest</p>
+              <div className="mt-2">
+                <BandChip score={route.lastPollutionScore} />
+              </div>
+            </div>
+            <AirRing score={route.lastPollutionScore} size={52} label="Latest score" />
           </div>
         </div>
         <div className="rounded-xl bg-canvas/50 p-3">

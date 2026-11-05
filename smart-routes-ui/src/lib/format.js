@@ -113,3 +113,38 @@ export const POLLUTANTS = [
   { key: 'no2', label: 'NO₂', pref: 'avoidNo2' },
   { key: 'ozone', label: 'Ozone', pref: 'avoidOzone' },
 ];
+
+/**
+ * WHO 2021 air-quality guidelines (µg/m³): 24-hour means, except ozone (8-hour).
+ * Readings here are snapshots, so they are compared as a rough guide, not a verdict.
+ */
+export const WHO_GUIDELINE = { pm25: 15, pm10: 45, no2: 25, ozone: 100 };
+
+/** "Within WHO guideline" or "2.4× WHO guideline", with the ratio for drawing a bar. */
+export function whoComparison(key, value) {
+  const limit = WHO_GUIDELINE[key];
+  if (value == null || !limit) return null;
+  const ratio = value / limit;
+  if (ratio <= 1) return { ratio, over: false, text: 'Within WHO guideline', short: 'Within WHO' };
+  const times = ratio < 10 ? ratio.toFixed(1).replace(/\.0$/, '') : Math.round(ratio).toString();
+  return { ratio, over: true, text: `${times}× WHO guideline`, short: `${times}× WHO` };
+}
+
+/** Percent change from `base` to `value`, rounded; positive = lower than base. */
+function percentLower(value, base) {
+  if (value == null || base == null || base <= 0) return null;
+  return Math.round(((base - value) / base) * 100);
+}
+
+/**
+ * Plain-language trade-off against the fastest route:
+ * { time: "+4 min" | "Same time" | null, pm25: "38% less PM2.5" | null }.
+ */
+export function tradeOff(route, fastest) {
+  if (!fastest || route === fastest || route.fastest) return { time: null, pm25: null };
+  const extra = Math.round(((route.travelTimeSeconds ?? 0) - (fastest.travelTimeSeconds ?? 0)) / 60);
+  const time = extra >= 1 ? `+${formatDuration(extra * 60)}` : extra <= -1 ? `${formatDuration(-extra * 60)} quicker` : 'Same time';
+  const p = percentLower(route.pollutionData?.pm25, fastest.pollutionData?.pm25);
+  const pm25 = p == null || p === 0 ? null : p > 0 ? `${p}% less PM2.5` : `${-p}% more PM2.5`;
+  return { time, pm25 };
+}

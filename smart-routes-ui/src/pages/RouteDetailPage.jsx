@@ -12,13 +12,14 @@ import {
   modeLabel,
   scoreBand,
   userTimeZone,
+  whoComparison,
 } from '../lib/format';
 import { useToast } from '../context/contexts';
 import { AirRoute, BaseMap, Pin } from '../components/map';
 import { boundsOf } from '../lib/mapUtils';
 import { HourlyChart, ScoreTrendChart } from '../components/charts';
 import Icon from '../components/Icon';
-import { BandChip, Card, EmptyState, ErrorNote, PageLoader, Toggle } from '../components/ui';
+import { AirRing, BandChip, Card, EmptyState, ErrorNote, PageLoader, PollutantReading, Toggle } from '../components/ui';
 
 const PERIODS = [
   { days: 1, label: '24 h' },
@@ -119,12 +120,8 @@ export default function RouteDetailPage() {
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Latest reading" value={formatScore(latest?.pollutionScore ?? route.lastPollutionScore)}>
-          <BandChip score={latest?.pollutionScore ?? route.lastPollutionScore} />
-        </Stat>
-        <Stat label={`Average · ${PERIODS.find((p) => p.days === days)?.label}`} value={formatScore(periodAverage)}>
-          <BandChip score={periodAverage} />
-        </Stat>
+        <ScoreStat label="Latest reading" score={latest?.pollutionScore ?? route.lastPollutionScore} />
+        <ScoreStat label={`Average · ${PERIODS.find((p) => p.days === days)?.label}`} score={periodAverage} />
         <Stat label="Cleanest time to go" value={formatHour(bestHour)}>
           <HourNote hour={bestHour} averages={history?.hourlyAverages} />
         </Stat>
@@ -163,16 +160,10 @@ export default function RouteDetailPage() {
             <>
               <dl className="mt-3 grid grid-cols-2 gap-3">
                 {POLLUTANTS.map((p) => (
-                  <div key={p.key} className="rounded-xl bg-canvas/50 p-3">
-                    <dt className="text-[11px] font-semibold uppercase tracking-wide text-faint">{p.label}</dt>
-                    <dd className="mt-1 text-xl font-bold tabular-nums text-ink">
-                      {latest[p.key] == null ? '–' : Math.round(latest[p.key])}
-                      <span className="ml-1 text-xs font-normal text-faint">µg/m³</span>
-                    </dd>
-                  </div>
+                  <PollutantReading key={p.key} large label={p.label} value={latest[p.key]} who={whoComparison(p.key, latest[p.key])} />
                 ))}
               </dl>
-              <p className="mt-3 text-xs text-faint">Measured {formatDateTime(latest.timestamp)}, averaged along the route.</p>
+              <p className="mt-3 text-xs text-faint">Measured {formatDateTime(latest.timestamp)}, averaged along the route. The tick on each bar marks the WHO guideline.</p>
             </>
           ) : (
             <p className="mt-3 text-sm text-faint">No readings in this period yet.</p>
@@ -253,6 +244,21 @@ function Stat({ label, value, children }) {
       <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">{label}</p>
       <p className="mt-1.5 text-3xl font-data font-bold tabular-nums text-ink">{value}</p>
       <div className="mt-2 min-h-5">{children}</div>
+    </div>
+  );
+}
+
+function ScoreStat({ label, score }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface/70 p-4">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-faint">{label}</p>
+        <div className="mt-2.5">
+          <BandChip score={score} />
+        </div>
+        <p className="mt-1.5 text-xs text-muted">Lower is cleaner</p>
+      </div>
+      <AirRing score={score} size={84} label={label} />
     </div>
   );
 }

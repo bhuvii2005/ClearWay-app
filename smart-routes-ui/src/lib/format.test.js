@@ -7,6 +7,8 @@ import {
   formatScore,
   modeLabel,
   scoreBand,
+  tradeOff,
+  whoComparison,
 } from './format';
 
 describe('scoreBand', () => {
@@ -67,5 +69,27 @@ describe('formatting', () => {
   it('shows the backend "commute" type as driving', () => {
     expect(modeLabel('commute')).toBe('Drive');
     expect(modeLabel('cycling')).toBe('Cycle');
+  });
+});
+
+describe('readable numbers', () => {
+  it('compares readings with the WHO guideline', () => {
+    expect(whoComparison('pm25', 12)).toMatchObject({ over: false, short: 'Within WHO' });
+    expect(whoComparison('pm25', 36)).toMatchObject({ over: true, text: '2.4× WHO guideline' });
+    expect(whoComparison('pm25', 30).short).toBe('2× WHO');
+    expect(whoComparison('pm10', 900).short).toBe('20× WHO');
+    expect(whoComparison('pm25', null)).toBeNull();
+  });
+
+  it('describes the trade-off against the fastest route', () => {
+    const fastest = { fastest: true, travelTimeSeconds: 600, pollutionData: { pm25: 40 } };
+    const slower = { travelTimeSeconds: 840, pollutionData: { pm25: 25 } };
+    expect(tradeOff(slower, fastest)).toEqual({ time: '+4 min', pm25: '38% less PM2.5' });
+    expect(tradeOff(fastest, fastest)).toEqual({ time: null, pm25: null });
+    expect(tradeOff({ travelTimeSeconds: 610, pollutionData: { pm25: 44 } }, fastest)).toEqual({
+      time: 'Same time',
+      pm25: '10% more PM2.5',
+    });
+    expect(tradeOff(slower, undefined)).toEqual({ time: null, pm25: null });
   });
 });

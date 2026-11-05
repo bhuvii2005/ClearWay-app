@@ -20,6 +20,84 @@ export function ScoreBadge({ score, size = 'md' }) {
   );
 }
 
+/**
+ * Air score as a ring: the arc fills toward 100 (the top of the European AQI's
+ * "very poor" band) in the band's colour, with the number in the middle.
+ */
+export function AirRing({ score, size = 56, label }) {
+  const band = scoreBand(score);
+  const stroke = size >= 80 ? 7 : 5;
+  const r = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * r;
+  const fill = score == null ? 0 : Math.min(Math.max(score, 0), 100) / 100;
+  return (
+    <div
+      className="relative shrink-0"
+      style={{ width: size, height: size }}
+      role="img"
+      aria-label={`${label ?? 'Air score'} ${formatScore(score)}, ${band.label.toLowerCase()}`}
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90" aria-hidden="true">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-surface-3" />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={band.color}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference * (1 - fill)}
+          className="transition-[stroke-dashoffset] duration-700 ease-out motion-reduce:transition-none"
+        />
+      </svg>
+      <span
+        className={`absolute inset-0 grid place-items-center font-data font-bold tabular-nums leading-none text-ink ${
+          size >= 80 ? 'text-2xl' : 'text-base'
+        }`}
+        aria-hidden="true"
+      >
+        {formatScore(score)}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * One pollutant reading with a bar against its WHO guideline (the tick mark).
+ * The bar shows up to 4× the guideline; the text always gives the exact multiple.
+ */
+export function PollutantReading({ label, value, who, large = false }) {
+  const scale = 4;
+  const width = who ? Math.min(who.ratio / scale, 1) * 100 : 0;
+  return (
+    <div className={`rounded-xl bg-canvas/60 ${large ? 'p-3' : 'px-2.5 py-2'}`}>
+      <dt className="flex items-baseline justify-between gap-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-faint">{label}</span>
+        {who && (
+          <span className={`text-[11px] font-semibold ${who.over ? 'text-warning' : 'text-good'}`}>{who.short}</span>
+        )}
+      </dt>
+      <dd className="mt-0.5">
+        <span className={`font-data font-bold tabular-nums text-ink ${large ? 'text-xl' : 'text-base'}`}>
+          {value == null ? '–' : Math.round(value)}
+        </span>
+        <span className="ml-1 text-[11px] text-faint">µg/m³</span>
+        {who && (
+          <span className="relative mt-1.5 block h-1.5 rounded-full bg-surface-3" aria-hidden="true">
+            <span
+              className={`absolute inset-y-0 left-0 rounded-full ${who.over ? 'bg-warning' : 'bg-good'}`}
+              style={{ width: `${Math.max(width, 3)}%` }}
+            />
+            <span className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink" style={{ left: `${100 / scale}%` }} />
+          </span>
+        )}
+      </dd>
+    </div>
+  );
+}
+
 export function BandChip({ score }) {
   const band = scoreBand(score);
   return (
