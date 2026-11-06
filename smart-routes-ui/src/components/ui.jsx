@@ -1,4 +1,6 @@
-import { useId } from 'react';
+import { useEffect, useId, useMemo, useRef } from 'react';
+import { animate, useReducedMotion } from 'motion/react';
+import { airStops } from '../lib/mapUtils';
 import Icon from './Icon';
 import { formatScore, scoreBand } from '../lib/format';
 
@@ -17,6 +19,35 @@ export function ScoreBadge({ score, size = 'md' }) {
       <BandChip score={score} />
       <span className="sr-only">{band.label}</span>
     </div>
+  );
+}
+
+/** A whole number that counts up to its value when it first appears or changes. */
+export function CountUp({ value, className = '' }) {
+  const ref = useRef(null);
+  const from = useRef(0);
+  const reduce = useReducedMotion();
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || value == null) return undefined;
+    if (reduce) {
+      el.textContent = Math.round(value);
+      return undefined;
+    }
+    const controls = animate(from.current, value, {
+      duration: 0.9,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate: (v) => {
+        el.textContent = Math.round(v);
+      },
+    });
+    from.current = value;
+    return () => controls.stop();
+  }, [value, reduce]);
+  return (
+    <span ref={ref} className={className}>
+      {value == null ? '–' : 0}
+    </span>
   );
 }
 
@@ -49,7 +80,8 @@ export function AirRing({ score, size = 56, label }) {
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={circumference * (1 - fill)}
-          className="transition-[stroke-dashoffset] duration-700 ease-out motion-reduce:transition-none"
+          className="ring-arc transition-[stroke-dashoffset] duration-700 ease-out motion-reduce:transition-none"
+          style={{ '--ring-length': circumference }}
         />
       </svg>
       <span
@@ -58,10 +90,31 @@ export function AirRing({ score, size = 56, label }) {
         }`}
         aria-hidden="true"
       >
-        {formatScore(score)}
+        <CountUp value={score == null ? null : Math.round(score)} />
       </span>
     </div>
   );
+}
+
+/**
+ * A thin bar showing how the air changes from start to end of a route,
+ * in the same colours as the line on the map.
+ */
+export function AirStrip({ coords, samples, score, className = '' }) {
+  const gradient = useMemo(() => {
+    const stops = airStops(coords ?? [], samples, score);
+    return `linear-gradient(90deg, ${stops.map(([at, c]) => `${c} ${(at * 100).toFixed(1)}%`).join(', ')})`;
+  }, [coords, samples, score]);
+  return (
+    <span className={`block h-1.5 overflow-hidden rounded-full bg-surface-3 ${className}`} aria-hidden="true">
+      <span className="air-strip block h-full rounded-full" style={{ background: gradient }} />
+    </span>
+  );
+}
+
+/** Grey placeholder block that shimmers while content loads. */
+export function Skeleton({ className = '' }) {
+  return <span className={`skeleton block ${className}`} aria-hidden="true" />;
 }
 
 /**
@@ -72,11 +125,11 @@ export function PollutantReading({ label, value, who, large = false }) {
   const scale = 4;
   const width = who ? Math.min(who.ratio / scale, 1) * 100 : 0;
   return (
-    <div className={`rounded-xl bg-canvas/60 ${large ? 'p-3' : 'px-2.5 py-2'}`}>
+    <div className={`rounded-xl bg-surface-2/60 ${large ? 'p-3.5' : 'px-3 py-2.5'}`}>
       <dt className="flex items-baseline justify-between gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-faint">{label}</span>
+        <span className="text-xs font-medium text-muted">{label}</span>
         {who && (
-          <span className={`text-[11px] font-semibold ${who.over ? 'text-warning' : 'text-good'}`}>{who.short}</span>
+          <span className={`text-[11px] font-medium ${who.over ? 'text-warning' : 'text-good'}`}>{who.short}</span>
         )}
       </dt>
       <dd className="mt-0.5">
@@ -101,7 +154,7 @@ export function PollutantReading({ label, value, who, large = false }) {
 export function BandChip({ score }) {
   const band = scoreBand(score);
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-surface/60 px-2 py-0.5 text-[11px] font-semibold text-ink-2">
+    <span className="inline-flex items-center gap-1.5 text-xs font-medium text-ink-2">
       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: band.color }} aria-hidden="true" />
       {band.label}
     </span>
@@ -110,9 +163,9 @@ export function BandChip({ score }) {
 
 const BUTTON_VARIANTS = {
   primary:
-    'bg-accent text-on-accent hover:bg-accent-hover disabled:bg-surface-2 disabled:text-faint',
+    'bg-accent text-on-accent shadow-[0_1px_2px_rgb(0_0_0/0.12),inset_0_1px_0_rgb(255_255_255/0.14)] hover:bg-accent-hover disabled:bg-surface-2 disabled:text-faint disabled:shadow-none',
   secondary:
-    'border border-line-strong bg-surface-2/60 text-ink hover:bg-surface-3/70 hover:border-line-strong disabled:opacity-50',
+    'bg-surface text-ink shadow-card ring-1 ring-hairline hover:bg-surface-2 disabled:opacity-50',
   dangerGhost: 'text-danger hover:bg-danger/10 hover:text-danger disabled:opacity-50',
   ghost: 'text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-50',
   danger: 'bg-danger-solid text-white hover:bg-danger-solid/90 disabled:opacity-50',
@@ -124,7 +177,7 @@ export function Button({ variant = 'primary', loading, children, className = '',
       type="button"
       {...props}
       disabled={props.disabled || loading}
-      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed ${BUTTON_VARIANTS[variant]} ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-[background-color,box-shadow,transform] duration-150 active:scale-[0.98] disabled:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed ${BUTTON_VARIANTS[variant]} ${className}`}
     >
       {loading ? <Spinner className="h-4 w-4" /> : icon ? <Icon name={icon} className="h-4 w-4" /> : null}
       {children}
@@ -152,7 +205,7 @@ export function TextField({ label, hint, error, className = '', ...props }) {
         id={id}
         {...props}
         aria-invalid={error ? true : undefined}
-        className="w-full rounded-lg border border-line-strong bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20 disabled:opacity-60"
+        className="w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-sm text-ink transition-shadow placeholder:text-faint focus:border-accent focus:outline-none focus:ring-4 focus:ring-accent/15 disabled:opacity-60"
       />
       {hint && !error && <p className="mt-1 text-xs text-faint">{hint}</p>}
       {error && <p className="mt-1 text-xs text-danger">{error}</p>}
@@ -178,21 +231,21 @@ export function Toggle({ checked, onChange, label, description, disabled }) {
           disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
         />
-        <span className="h-6 w-11 rounded-full bg-surface-3 transition-colors peer-checked:bg-accent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent peer-disabled:opacity-50" />
-        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5" />
+        <span className="h-6 w-11 rounded-full bg-line-strong transition-colors duration-200 peer-checked:bg-accent peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent peer-disabled:opacity-50" />
+        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-[0_1px_3px_rgb(0_0_0/0.25)] transition-transform duration-200 ease-[var(--ease-out-soft)] peer-checked:translate-x-5" />
       </span>
     </label>
   );
 }
 
 export function Card({ children, className = '' }) {
-  return <section className={`rounded-2xl border border-line bg-surface/70 p-5 ${className}`}>{children}</section>;
+  return <section className={`rounded-2xl bg-surface p-5 shadow-card ${className}`}>{children}</section>;
 }
 
 export function ErrorNote({ children }) {
   if (!children) return null;
   return (
-    <p role="alert" className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[13px] text-danger">
+    <p role="alert" className="flex items-start gap-2 rounded-xl bg-danger/10 px-3 py-2 text-[13px] text-danger">
       <Icon name="alert" className="mt-px h-4 w-4 shrink-0" />
       <span>{children}</span>
     </p>
@@ -201,8 +254,8 @@ export function ErrorNote({ children }) {
 
 export function EmptyState({ icon, title, children, action }) {
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line px-6 py-14 text-center">
-      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-2/80 text-muted">
+    <div className="flex flex-col items-center rounded-2xl bg-surface px-6 py-14 text-center shadow-card">
+      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/10 text-accent-ink">
         <Icon name={icon} className="h-6 w-6" />
       </span>
       <h2 className="text-base font-semibold text-ink">{title}</h2>

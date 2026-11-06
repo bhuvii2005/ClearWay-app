@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import Icon from './Icon';
 import { Spinner } from './ui';
 import { searchPlaces } from '../lib/geocode';
@@ -7,7 +8,11 @@ import { searchPlaces } from '../lib/geocode';
  * Address box with suggestions as you type. `value` is the chosen place
  * ({ lat, lng, name, detail }) or null; picking a suggestion calls onSelect.
  */
-export default function PlaceSearch({ label, marker, value, onSelect, onClear, near, placeholder, active, onFocus }) {
+/**
+ * `bare` drops the box and marker so a parent can stack two searches in one panel.
+ * `trailing` shows in place of the clear button while the box is empty.
+ */
+export default function PlaceSearch({ label, marker, value, onSelect, onClear, near, placeholder, active, onFocus, bare = false, trailing }) {
   const [query, setQuery] = useState(value?.name ?? '');
   const [shownValue, setShownValue] = useState(value);
   // The last finished search: which text it was for, and what it found.
@@ -82,18 +87,22 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
         {label}
       </label>
       <div
-        className={`flex items-center gap-2 rounded-lg border bg-surface pl-2.5 pr-1 transition-colors ${
-          active ? 'border-accent/70 ring-2 ring-accent/15' : 'border-line-strong'
-        }`}
+        className={
+          bare
+            ? `flex items-center gap-2 rounded-xl pl-3 pr-1 transition-colors ${active ? 'bg-surface shadow-card' : 'hover:bg-surface/60'}`
+            : `flex items-center gap-2 rounded-xl border bg-surface pl-2.5 pr-1 transition-[border-color,box-shadow] ${
+                active ? 'border-accent/70 ring-4 ring-accent/15' : 'border-line-strong'
+              }`
+        }
       >
-        <span
+        {!bare && (<span
           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${
             marker === 'A' ? 'bg-accent text-on-accent' : 'bg-haze text-on-haze'
           }`}
           aria-hidden="true"
         >
           {marker}
-        </span>
+        </span>)}
         <input
           id={`${listId}-input`}
           role="combobox"
@@ -116,9 +125,10 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
             blurTimer.current = setTimeout(() => setOpen(false), 150);
           }}
           onKeyDown={onKeyDown}
-          className="h-10 min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint focus:outline-none"
+          className={`min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-faint focus:outline-none ${bare ? 'h-11' : 'h-10'}`}
         />
         {loading && <Spinner className="h-4 w-4 shrink-0 text-faint" />}
+        {!(value || query) && trailing}
         {(value || query) && (
           <button
             type="button"
@@ -127,18 +137,22 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
               setQuery('');
               onClear();
             }}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-faint hover:bg-surface-2 hover:text-ink-2"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-faint transition-colors hover:bg-surface-2 hover:text-ink-2"
           >
             <Icon name="x" className="h-4 w-4" />
           </button>
         )}
       </div>
 
+      <AnimatePresence>
       {showList && (
-        <ul
+        <motion.ul
           id={listId}
           role="listbox"
-          className="absolute inset-x-0 top-full z-[1200] mt-1 max-h-72 overflow-y-auto rounded-lg border border-line-strong bg-surface py-1 shadow-2xl"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4, transition: { duration: 0.1 } }}
+          className="absolute inset-x-0 top-full z-[1200] mt-1.5 max-h-72 overflow-y-auto rounded-2xl bg-surface p-1.5 shadow-pop"
         >
           {results.map((place, i) => (
             <li
@@ -148,9 +162,11 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => choose(place)}
               onMouseEnter={() => setHighlight(i)}
-              className={`flex cursor-pointer items-start gap-2.5 px-3 py-2 ${i === highlight ? 'bg-surface-2' : ''}`}
+              className={`flex cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2 ${i === highlight ? 'bg-surface-2' : ''}`}
             >
-              <Icon name="pin" className="mt-0.5 h-4 w-4 shrink-0 text-faint" />
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-2 text-muted">
+                <Icon name="pin" className="h-4 w-4" />
+              </span>
               <span className="min-w-0">
                 <span className="block truncate text-sm text-ink">{place.name}</span>
                 {place.detail && <span className="block truncate text-xs text-faint">{place.detail}</span>}
@@ -162,8 +178,9 @@ export default function PlaceSearch({ label, marker, value, onSelect, onClear, n
               {failed ? 'Place search is unavailable right now. Click the map instead.' : 'No places found.'}
             </li>
           )}
-        </ul>
+        </motion.ul>
       )}
+      </AnimatePresence>
     </div>
   );
 }

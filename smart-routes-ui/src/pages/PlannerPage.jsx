@@ -16,7 +16,8 @@ import { useAuth, useToast } from '../context/contexts';
 import { AirRoute, BaseMap, FitBounds, OtherRoutes, Pin } from '../components/map';
 import PlaceSearch from '../components/PlaceSearch';
 import Icon from '../components/Icon';
-import { AirRing, BandChip, Button, ErrorNote, PollutantReading, TextField, Toggle } from '../components/ui';
+import { AnimatePresence, motion } from 'motion/react';
+import { AirRing, AirStrip, BandChip, Button, ErrorNote, PollutantReading, Skeleton, Spinner, TextField, Toggle } from '../components/ui';
 
 const MAX_SAVED_POINTS = 10000;
 const ALT_LAYERS = ['alt-routes'];
@@ -221,19 +222,30 @@ export default function PlannerPage() {
         </BaseMap>
       </div>
 
-      <aside
+      <motion.aside
         aria-label="Route planner"
-        className="absolute inset-x-0 bottom-0 z-10 max-h-[58%] overflow-y-auto rounded-t-2xl border-t border-line bg-canvas/95 p-4 shadow-2xl backdrop-blur lg:inset-x-auto lg:bottom-4 lg:left-4 lg:top-4 lg:max-h-none lg:w-[410px] lg:rounded-2xl lg:border lg:p-5"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 30 }}
+        className="absolute inset-x-0 bottom-0 z-10 max-h-[58%] overflow-y-auto rounded-t-3xl bg-surface/95 px-4 pb-5 pt-2 shadow-pop backdrop-blur-xl lg:inset-x-auto lg:bottom-auto lg:left-4 lg:top-4 lg:max-h-[calc(100%-2rem)] lg:w-[400px] lg:rounded-3xl lg:p-5"
       >
-        <h1 className="font-display text-lg font-bold tracking-tight">Find a cleaner route</h1>
-        <p className="mt-0.5 text-[13px] text-muted">Routes are ranked by the air along the way.</p>
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line-strong lg:hidden" aria-hidden="true" />
+        <h1 className="font-display text-xl font-bold tracking-tight">Where to?</h1>
+        <p className="mt-0.5 text-[13px] text-muted">We rank every route by the air along the way.</p>
 
-        <div className="mt-4 flex gap-2">
-          <div className="min-w-0 flex-1 space-y-2">
+        {/* Start and destination share one box, joined by a dotted line like a route. */}
+        <div className="relative mt-4 rounded-2xl bg-surface-2/70 p-1">
+          <div className="pointer-events-none absolute bottom-[21px] left-[17px] top-[21px] flex flex-col items-center" aria-hidden="true">
+            <span className="h-2.5 w-2.5 rounded-full border-[2.5px] border-accent bg-surface" />
+            <span className="my-1.5 w-0 flex-1 border-l-2 border-dashed border-faint/60" />
+            <span className="h-2.5 w-2.5 rounded-[3px] bg-haze" />
+          </div>
+          <div className="space-y-1 pl-8 pr-11">
             <PlaceSearch
+              bare
               label="Start"
               marker="A"
-              placeholder="Start point"
+              placeholder="Choose a start point"
               value={origin}
               near={mapCenter}
               active={focus === 'origin'}
@@ -246,11 +258,24 @@ export default function PlannerPage() {
                 setPoint('origin', null);
                 setFocus('origin');
               }}
+              trailing={
+                <button
+                  type="button"
+                  onClick={locateMe}
+                  disabled={locating}
+                  title="Use my location"
+                  aria-label="Use my location as the start"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-accent-ink transition-colors hover:bg-accent/10 disabled:opacity-50"
+                >
+                  {locating ? <Spinner className="h-4 w-4" /> : <Icon name="locate" className="h-4 w-4" />}
+                </button>
+              }
             />
             <PlaceSearch
+              bare
               label="Destination"
               marker="B"
-              placeholder="Destination"
+              placeholder="Choose a destination"
               value={destination}
               near={mapCenter}
               active={focus === 'destination'}
@@ -262,45 +287,46 @@ export default function PlannerPage() {
               }}
             />
           </div>
-          <div className="flex flex-col justify-between">
-            <button
-              type="button"
-              onClick={locateMe}
-              disabled={locating}
-              title="Use my location as the start"
-              aria-label="Use my location as the start"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-line-strong text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-50"
-            >
-              <Icon name="locate" className="h-[18px] w-[18px]" />
-            </button>
-            <button
-              type="button"
-              onClick={swap}
-              disabled={!origin && !destination}
-              title="Swap start and destination"
-              aria-label="Swap start and destination"
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-line-strong text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-40"
-            >
-              <Icon name="swap" className="h-[18px] w-[18px] rotate-90" />
-            </button>
-          </div>
+          <motion.button
+            type="button"
+            onClick={swap}
+            disabled={!origin && !destination}
+            title="Swap start and destination"
+            aria-label="Swap start and destination"
+            whileTap={{ rotate: 180, scale: 0.9 }}
+            className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-muted shadow-card transition-colors hover:text-ink disabled:opacity-40"
+          >
+            <Icon name="swap" className="h-4 w-4" />
+          </motion.button>
         </div>
 
-        {nextHint && <p className="mt-2 text-xs text-faint">{nextHint}</p>}
-        {origin && destination && !routes.length && (
-          <p className="mt-2 text-xs text-faint">Clicking the map now moves the highlighted point. You can also drag the pins.</p>
-        )}
+        <AnimatePresence initial={false} mode="wait">
+          {(nextHint || (origin && destination && !routes.length && !searching)) && (
+            <motion.p
+              key={nextHint ?? 'move'}
+              initial={{ opacity: 0, y: -2 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              className="mt-2 px-1 text-xs text-faint"
+            >
+              {nextHint ?? 'Tip: click the map or drag a pin to fine-tune a point.'}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
         <fieldset className="mt-4">
           <legend className="sr-only">Travel mode</legend>
-          <div className="grid grid-cols-4 gap-1 rounded-lg border border-line bg-surface/60 p-1">
+          <div className="grid grid-cols-4 gap-1 rounded-2xl bg-surface-2/70 p-1">
             {MODES.map((m) => (
               <label
                 key={m.id}
-                className={`flex h-14 cursor-pointer flex-col items-center justify-center gap-0.5 rounded-md text-xs font-semibold transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
-                  mode === m.id ? 'bg-surface-2 text-accent-ink' : 'text-muted hover:text-ink'
+                className={`relative flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl text-[13px] font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
+                  mode === m.id ? 'text-ink' : 'text-muted hover:text-ink'
                 }`}
               >
+                {mode === m.id && (
+                  <motion.span layoutId="mode-pill" className="absolute inset-0 rounded-xl bg-surface shadow-card" />
+                )}
                 <input
                   type="radio"
                   name="mode"
@@ -312,27 +338,25 @@ export default function PlannerPage() {
                   }}
                   className="sr-only"
                 />
-                <Icon name={m.icon} className="h-5 w-5" />
-                {m.label}
+                <Icon name={m.icon} className={`relative h-4 w-4 ${mode === m.id ? 'text-accent-ink' : ''}`} />
+                <span className="relative">{m.label}</span>
               </label>
             ))}
           </div>
         </fieldset>
 
-        <Button className="mt-4 w-full" onClick={findRoutes} disabled={!origin || !destination} loading={searching} icon="search">
-          {searching ? 'Checking the air on each route…' : 'Compare routes'}
+        <Button className="mt-4 h-12 w-full text-[15px]" onClick={findRoutes} disabled={!origin || !destination} loading={searching} icon="search">
+          {searching ? 'Checking the air…' : 'Compare routes'}
         </Button>
 
-        <p className="mt-2.5 text-xs text-faint">
+        <p className="mt-3 px-1 text-xs text-faint">
           {sensitivities.length ? (
-            <>
-              Weighted for your sensitivity to {sensitivities.map((s) => s.label).join(', ')}.{' '}
-            </>
+            <>Tuned for your sensitivity to {sensitivities.map((s) => s.label).join(', ')}. </>
           ) : (
-            'Sensitive to a particular pollutant? '
+            'Sensitive to a pollutant? '
           )}
           <Link to="/account" className="font-medium text-muted underline decoration-line-strong underline-offset-2 hover:text-ink">
-            {sensitivities.length ? 'Change' : 'Set it in your account'}
+            {sensitivities.length ? 'Change' : 'Tell us'}
           </Link>
         </p>
 
@@ -342,14 +366,40 @@ export default function PlannerPage() {
           </div>
         )}
 
-        {routes.length > 0 && (
-          <section aria-label="Route options" className="mt-5 border-t border-line pt-4">
-            <h2 className="mb-3 text-sm font-semibold text-ink-2">
-              {routes.length} {routes.length === 1 ? 'option' : 'options'} · {modeLabel(mode).toLowerCase()}
+        {searching && (
+          <div className="mt-6 space-y-2.5" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="rounded-2xl bg-surface p-4 shadow-card" style={{ opacity: 1 - i * 0.25 }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3.5 w-20" />
+                    <Skeleton className="h-5 w-28" />
+                  </div>
+                  <Skeleton className="h-[52px] w-[52px] !rounded-full" />
+                </div>
+                <Skeleton className="mt-3 h-1.5 w-full" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!searching && routes.length > 0 && (
+          <section aria-label="Route options" className="mt-6">
+            <h2 className="mb-2.5 flex items-baseline justify-between px-1 text-sm font-semibold text-ink">
+              {routes.length} {routes.length === 1 ? 'route' : 'routes'}
+              <span className="text-xs font-normal text-faint">Cleanest first · {modeLabel(mode).toLowerCase()}</span>
             </h2>
-            <ol className="space-y-2">
+            <motion.ol
+              className="space-y-2.5"
+              initial="hidden"
+              animate="show"
+              variants={{ show: { transition: { staggerChildren: 0.07 } } }}
+            >
               {routes.map((route, i) => (
-                <li key={`${searchId}-${i}`}>
+                <motion.li
+                  key={`${searchId}-${i}`}
+                  variants={{ hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }}
+                >
                   <RouteOption
                     route={route}
                     rank={i}
@@ -367,12 +417,12 @@ export default function PlannerPage() {
                       })
                     }
                   />
-                </li>
+                </motion.li>
               ))}
-            </ol>
+            </motion.ol>
           </section>
         )}
-      </aside>
+      </motion.aside>
     </div>
   );
 }
@@ -412,97 +462,110 @@ function RouteOption({ route, rank, fastest, selected, onSelect, defaultName, mo
 
   return (
     <div
-      className={`rounded-xl border transition-colors ${
-        selected ? 'border-accent bg-surface shadow-md ring-1 ring-accent/30' : 'border-line bg-surface/70 hover:border-line-strong'
+      className={`overflow-hidden rounded-2xl bg-surface transition-shadow duration-200 ${
+        selected ? 'shadow-float ring-2 ring-accent' : 'shadow-card ring-1 ring-hairline hover:shadow-float'
       }`}
     >
-      <button type="button" onClick={onSelect} aria-pressed={selected} className="w-full p-3.5 text-left">
+      <button type="button" onClick={onSelect} aria-pressed={selected} className="w-full p-4 text-left focus-visible:outline-none">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-sm font-semibold text-ink">{rank === 0 ? 'Cleanest' : `Option ${rank + 1}`}</span>
-              {route.fastest && (
-                <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-ink-2">Fastest</span>
+            <div className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium">
+              {rank === 0 ? (
+                <span className="inline-flex items-center gap-1 text-accent-ink">
+                  <Icon name="leaf" className="h-3.5 w-3.5" /> Cleanest
+                </span>
+              ) : (
+                <span className="text-muted">Route {rank + 1}</span>
               )}
+              {route.fastest && <span className="rounded-md bg-surface-2 px-1.5 py-px text-[11px] text-ink-2">Fastest</span>}
             </div>
-            <p className="mt-0.5 text-[13px] text-muted">
-              {formatDuration(route.travelTimeSeconds)} · {formatDistanceMeters(route.distanceMeters)}
+            <p className="mt-1 flex items-baseline gap-2">
+              <span className="font-display text-xl font-bold tracking-tight text-ink">{formatDuration(route.travelTimeSeconds)}</span>
+              <span className="text-[13px] text-muted">{formatDistanceMeters(route.distanceMeters)}</span>
             </p>
           </div>
-          <AirRing score={route.pollutionScore} label="Exposure score" />
+          <AirRing score={route.pollutionScore} size={52} label="Exposure score" />
         </div>
-        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+
+        <AirStrip coords={route.pathCoordinates} samples={route.airSamples} score={route.pollutionScore} className="mt-3" />
+        <div className="mt-1.5 flex justify-between text-[11px] text-faint" aria-hidden="true">
+          <span>Start</span>
+          <span>Destination</span>
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <BandChip score={route.pollutionScore} />
-          <span className="text-xs text-muted">{exposureText(route)}</span>
+          {trade.pm25 && (
+            <span className={`inline-flex items-center gap-1 text-xs font-medium ${trade.pm25.includes('less') ? 'text-good' : 'text-warning'}`}>
+              <Icon name="leaf" className="h-3.5 w-3.5" /> {trade.pm25}
+            </span>
+          )}
+          {trade.time && (
+            <span className="inline-flex items-center gap-1 text-xs text-muted">
+              <Icon name="clock" className="h-3.5 w-3.5" /> {trade.time} vs fastest
+            </span>
+          )}
+          {!trade.pm25 && !trade.time && <span className="text-xs text-muted">{exposureText(route)}</span>}
         </div>
-        {(trade.time || trade.pm25) && (
-          <p className="mt-2 flex flex-wrap gap-1.5 text-xs font-semibold">
-            {trade.time && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-surface-2 px-2 py-0.5 text-ink-2">
-                <Icon name="clock" className="h-3.5 w-3.5" /> {trade.time} <span className="font-normal text-muted">vs fastest</span>
-              </span>
-            )}
-            {trade.pm25 && (
-              <span
-                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 ${
-                  trade.pm25.includes('less') ? 'bg-good/10 text-good' : 'bg-warning/10 text-warning'
-                }`}
-              >
-                <Icon name="leaf" className="h-3.5 w-3.5" /> {trade.pm25}
-              </span>
-            )}
-          </p>
-        )}
       </button>
 
-      {selected && (
-        <div className="border-t border-line px-3.5 pb-3.5 pt-3">
-          {data && (
-            <dl className="grid grid-cols-2 gap-2">
-              {POLLUTANTS.map((p) => (
-                <PollutantReading key={p.key} label={p.label} value={data[p.key]} who={whoComparison(p.key, data[p.key])} />
-              ))}
-            </dl>
-          )}
-          {data && (
-            <p className="mt-1.5 text-[11px] text-faint">
-              Average along the route now. The tick marks the WHO guideline.
-            </p>
-          )}
+      <AnimatePresence initial={false}>
+        {selected && (
+          <motion.div
+            key="details"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+          >
+            <div className="px-4 pb-4">
+              <div className="mb-3 h-px bg-line" />
+              {data && (
+                <>
+                  <dl className="grid grid-cols-2 gap-2">
+                    {POLLUTANTS.map((p) => (
+                      <PollutantReading key={p.key} label={p.label} value={data[p.key]} who={whoComparison(p.key, data[p.key])} />
+                    ))}
+                  </dl>
+                  <p className="mt-2 text-[11px] text-faint">Live average along the route · tick = WHO guideline</p>
+                </>
+              )}
 
-          {savedId ? (
-            <Link
-              to={`/routes/${savedId}`}
-              className="mt-3 flex items-center justify-center gap-2 rounded-lg border border-accent/40 bg-accent/10 py-2 text-sm font-semibold text-accent-ink hover:bg-accent/15"
-            >
-              <Icon name="check" className="h-4 w-4" /> Saved · open route
-            </Link>
-          ) : saving ? (
-            <form onSubmit={save} className="mt-3 space-y-3">
-              <TextField label="Route name" required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
-              <Toggle
-                checked={monitor}
-                onChange={setMonitor}
-                label="Watch this route"
-                description="Check the air every 15 minutes and alert me when it turns poor."
-              />
-              <ErrorNote>{error}</ErrorNote>
-              <div className="flex gap-2">
-                <Button type="submit" loading={busy} className="flex-1" disabled={!name.trim()}>
-                  Save route
+              {savedId ? (
+                <Link
+                  to={`/routes/${savedId}`}
+                  className="mt-3 flex h-10 items-center justify-center gap-2 rounded-xl bg-accent/10 text-sm font-semibold text-accent-ink transition-colors hover:bg-accent/15"
+                >
+                  <Icon name="check" className="h-4 w-4" /> Saved · open route
+                </Link>
+              ) : saving ? (
+                <form onSubmit={save} className="mt-3 space-y-3">
+                  <TextField label="Route name" required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
+                  <Toggle
+                    checked={monitor}
+                    onChange={setMonitor}
+                    label="Watch this route"
+                    description="Check the air every 15 minutes and alert me when it turns poor."
+                  />
+                  <ErrorNote>{error}</ErrorNote>
+                  <div className="flex gap-2">
+                    <Button type="submit" loading={busy} className="flex-1" disabled={!name.trim()}>
+                      Save route
+                    </Button>
+                    <Button variant="ghost" onClick={() => setSaving(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <Button variant="secondary" className="mt-3 w-full" icon="save" onClick={() => setSaving(true)}>
+                  Save this route
                 </Button>
-                <Button variant="ghost" onClick={() => setSaving(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <Button variant="secondary" className="mt-3 w-full" icon="save" onClick={() => setSaving(true)}>
-              Save this route
-            </Button>
-          )}
-        </div>
-      )}
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

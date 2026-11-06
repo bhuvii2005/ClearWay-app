@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Browser smoke test: signs up, compares and saves a route, then visits every page.
  * Needs the API (8090), the dev server (5173) and a TomTom key. Screenshots go to e2e/screenshots.
  *   npm run e2e            (set CHROME_PATH if Chrome is not in the default Windows location)
@@ -44,7 +44,7 @@ await page.getByLabel('Email').fill(`asha${Date.now()}@test.dev`);
 await page.getByLabel('Password').fill('password123');
 await page.getByRole('button', { name: 'Create account' }).click();
 await page.waitForURL(BASE + '/');
-await page.getByText('Find a cleaner route').waitFor();
+await page.getByRole('heading', { name: 'Where to?' }).waitFor();
 await page.waitForTimeout(1500);
 await shot('02-planner-empty');
 
@@ -62,7 +62,7 @@ await page.getByRole('option').first().click();
 step('compare cycling');
 await page.getByText('Cycle', { exact: true }).click();
 await page.getByRole('button', { name: 'Compare routes' }).click();
-await page.getByRole('heading', { name: /option/ }).waitFor({ timeout: 30000 });
+await page.getByRole('heading', { name: /^\d+ routes?/ }).waitFor({ timeout: 30000 });
 await page.waitForTimeout(1500);
 await shot('04-results');
 
@@ -80,6 +80,7 @@ if ((await optionButtons.count()) > 1) {
   await page.waitForTimeout(500);
 }
 await optionButtons.nth(0).click();
+await page.waitForTimeout(800); // let the other card finish closing
 
 step('save route');
 await page.getByRole('button', { name: 'Save this route' }).click();

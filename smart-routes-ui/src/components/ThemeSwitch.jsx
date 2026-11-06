@@ -13,11 +13,11 @@ export default function ThemeSwitch({ className = '' }) {
       aria-label="Dark theme"
       title={dark ? 'Switch to light theme' : 'Switch to dark theme'}
       onClick={toggle}
-      className={`relative inline-flex h-9 w-[68px] shrink-0 items-center rounded-full border border-line bg-surface-2 p-1 transition-colors hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${className}`}
+      className={`relative inline-flex h-9 w-[68px] shrink-0 items-center rounded-full bg-surface-2/70 p-1 transition-colors hover:bg-surface-3/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${className}`}
     >
       <span
         aria-hidden="true"
-        className={`absolute top-1 h-7 w-7 rounded-full bg-surface shadow-sm ring-1 ring-line transition-transform duration-200 motion-reduce:transition-none ${dark ? 'translate-x-8' : 'translate-x-0'}`}
+        className={`absolute top-1 h-7 w-7 rounded-full bg-surface shadow-card transition-transform duration-300 ease-[var(--ease-out-soft)] motion-reduce:transition-none ${dark ? 'translate-x-8' : 'translate-x-0'}`}
       />
       <span className="relative z-10 grid w-7 place-items-center" aria-hidden="true">
         <Icon name="sun" className={`h-4 w-4 ${dark ? 'text-faint' : 'text-haze'}`} strokeWidth={2.2} />

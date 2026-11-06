@@ -28,6 +28,14 @@
   --color-danger: #b91c1c;
   --color-danger-solid: #dc2626;
 
+  /* Elevation: soft, layered shadows do the separating instead of borders. */
+  --shadow-card: 0 1px 2px rgb(15 27 45 / 0.04), 0 2px 10px -2px rgb(15 27 45 / 0.06);
+  --shadow-float: 0 1px 2px rgb(15 27 45 / 0.05), 0 10px 30px -6px rgb(15 27 45 / 0.16);
+  --shadow-pop: 0 2px 6px rgb(15 27 45 / 0.06), 0 24px 56px -12px rgb(15 27 45 / 0.28);
+  --color-hairline: rgb(15 27 45 / 0.07); /* 1px edges on top of shadows */
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-display: "Bricolage Grotesque Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-data: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
@@ -55,6 +63,11 @@
   --color-danger: #fb7185;
   --color-danger-solid: #e11d48;
 
+  --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.04) inset, 0 2px 10px -2px rgb(0 0 0 / 0.5);
+  --shadow-float: 0 0 0 1px rgb(255 255 255 / 0.05) inset, 0 16px 40px -8px rgb(0 0 0 / 0.7);
+  --shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.06) inset, 0 28px 64px -12px rgb(0 0 0 / 0.8);
+  --color-hairline: rgb(255 255 255 / 0.07);
+
   --font-display: "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-data: "JetBrains Mono Variable", ui-monospace, monospace;
   color-scheme: dark;
@@ -76,6 +89,56 @@ body,
   color: var(--color-ink);
 }
 
+::selection {
+  background: color-mix(in srgb, var(--color-accent) 25%, transparent);
+}
+
+/* Thin, quiet scrollbars inside panels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line-strong) transparent;
+}
+
+/* Loading placeholders: a soft light sweep across a block. */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-surface) 70%, transparent), transparent);
+  animation: shimmer 1.4s var(--ease-out-soft) infinite;
+}
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Rings draw themselves in; air strips sweep in from the left. */
+.ring-arc {
+  animation: ring-draw 900ms var(--ease-out-soft) both;
+}
+@keyframes ring-draw {
+  from {
+    stroke-dashoffset: var(--ring-length);
+  }
+}
+.air-strip {
+  transform-origin: left;
+  animation: strip-in 700ms var(--ease-out-soft) both;
+}
+@keyframes strip-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+
 /* Big numbers line up in both themes. */
 .font-data {
   font-variant-numeric: tabular-nums;
@@ -89,9 +152,9 @@ body,
 
 .maplibregl-ctrl-group {
   background: color-mix(in srgb, var(--color-surface) 94%, transparent) !important;
-  border: 1px solid var(--color-line);
+  border: 0;
   border-radius: 12px !important;
-  box-shadow: 0 8px 24px rgb(15 27 45 / 0.14) !important;
+  box-shadow: var(--shadow-float) !important;
   overflow: hidden;
 }
 
@@ -137,6 +200,18 @@ body,
   box-shadow: 0 6px 16px rgb(0 0 0 / 0.3);
   cursor: grab;
   margin-bottom: 6px;
+  animation: pin-drop 520ms var(--ease-out-soft) both;
+}
+
+@keyframes pin-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-18px) rotate(-45deg) scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(-45deg);
+  }
 }
 
 .cw-pin span {
@@ -200,7 +275,11 @@ body,
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .cw-pin,
+  .ring-arc,
+  .air-strip,
   .cw-pin::after,
+  .skeleton::after,
   .toast-in {
     animation: none;
   }

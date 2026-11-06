@@ -1,14 +1,15 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { ToastContext } from './contexts';
 import Icon from '../components/Icon';
 
 const TONES = {
-  success: { icon: 'check', ring: 'border-accent/40', iconColor: 'text-accent-ink' },
-  error: { icon: 'alert', ring: 'border-danger/40', iconColor: 'text-danger' },
-  info: { icon: 'info', ring: 'border-accent/40', iconColor: 'text-accent-ink' },
-  poor: { icon: 'wind', ring: 'border-warning/50', iconColor: 'text-warning' },
-  clean: { icon: 'leaf', ring: 'border-accent/50', iconColor: 'text-accent-ink' },
+  success: { icon: 'check', chip: 'bg-accent/10', iconColor: 'text-accent-ink' },
+  error: { icon: 'alert', chip: 'bg-danger/10', iconColor: 'text-danger' },
+  info: { icon: 'info', chip: 'bg-accent/10', iconColor: 'text-accent-ink' },
+  poor: { icon: 'wind', chip: 'bg-warning/10', iconColor: 'text-warning' },
+  clean: { icon: 'leaf', chip: 'bg-accent/10', iconColor: 'text-accent-ink' },
 };
 
 /** Small messages in the corner: confirmations, errors and live air alerts. */
@@ -39,15 +40,22 @@ export default function ToastProvider({ children }) {
         aria-live="polite"
         className="pointer-events-none fixed inset-x-0 bottom-0 z-[2000] flex flex-col items-center gap-2 p-4 sm:inset-x-auto sm:right-0 sm:items-end"
       >
+        <AnimatePresence initial={false}>
         {toasts.map((toast) => {
           const tone = TONES[toast.tone] ?? TONES.info;
           return (
-            <div
+            <motion.div
               key={toast.id}
               role="status"
-              className={`toast-in pointer-events-auto flex w-full max-w-sm gap-3 rounded-xl border bg-surface/95 p-3.5 shadow-2xl backdrop-blur ${tone.ring}`}
+              layout
+              initial={{ opacity: 0, y: 24, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, x: 40, transition: { duration: 0.18 } }}
+              className="pointer-events-auto flex w-full max-w-sm gap-3 rounded-2xl bg-surface/95 p-3.5 shadow-pop ring-1 ring-hairline backdrop-blur-xl"
             >
-              <Icon name={tone.icon} className={`mt-0.5 h-5 w-5 shrink-0 ${tone.iconColor}`} />
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${tone.chip}`}>
+                <Icon name={tone.icon} className={`h-4 w-4 ${tone.iconColor}`} />
+              </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-ink">{toast.title}</p>
                 {toast.body && <p className="mt-0.5 text-[13px] leading-snug text-muted">{toast.body}</p>}
@@ -65,13 +73,14 @@ export default function ToastProvider({ children }) {
                 type="button"
                 onClick={() => dismiss(toast.id)}
                 aria-label="Dismiss"
-                className="-m-1 h-7 w-7 shrink-0 rounded-md p-1 text-faint hover:bg-surface-2 hover:text-ink-2"
+                className="-m-1 h-7 w-7 shrink-0 rounded-lg p-1.5 text-faint transition-colors hover:bg-surface-2 hover:text-ink-2"
               >
-                <Icon name="x" className="h-5 w-5" />
+                <Icon name="x" className="h-4 w-4" />
               </button>
-            </div>
+            </motion.div>
           );
         })}
+        </AnimatePresence>
       </div>
     </ToastContext.Provider>
   );
