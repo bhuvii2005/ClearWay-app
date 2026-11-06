@@ -13,12 +13,13 @@ ClearWay finds walking, jogging, cycling and driving routes with cleaner air. It
 - **Live alerts:** sent instantly over a private WebSocket channel and stored, so missed alerts are still listed.
 - **History and best times:** score history, average by hour of day, and the cleanest and worst times to travel.
 - **Accounts:** JWT sign-in, BCrypt passwords, password change, sign out on all devices, delete account.
+- **Clean, calm interface:** air-coloured routes on a vector map, WHO guideline comparisons, a 24-hour best-time strip, light and dark themes, gentle animations (switched off if your system asks for reduced motion), and a landing page for new visitors.
 
 ## Tech stack
 
 | Part | Technology |
 |---|---|
-| Web app | React 19, Vite 7, React Router 7, Tailwind CSS 4, React-Leaflet, Recharts, STOMP over SockJS |
+| Web app | React 19, Vite 7, React Router 7, Tailwind CSS 4, MapLibre GL (OpenFreeMap tiles), Motion, Lucide icons, Recharts, STOMP over SockJS |
 | API | Java 17, Spring Boot 4, Spring Security, Hibernate Spatial, Resilience4j, Caffeine |
 | Database | PostgreSQL 15 with PostGIS, Flyway migrations |
 | Tooling | Docker Compose, GitHub Actions, JUnit 5 + Testcontainers, Vitest, Playwright smoke test |
