@@ -62,6 +62,8 @@ export default function PlannerPage() {
   const [locating, setLocating] = useState(false);
   const [searchId, setSearchId] = useState(0);
   const [hoverRoute, setHoverRoute] = useState(false);
+  // Phones: the planner is a bottom sheet that can be pulled up to show more.
+  const [sheetTall, setSheetTall] = useState(false);
   const lookupRef = useRef({});
 
   const sensitivities = POLLUTANTS.filter((p) => user?.[p.pref]);
@@ -227,9 +229,21 @@ export default function PlannerPage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 260, damping: 30 }}
-        className="absolute inset-x-0 bottom-0 z-10 max-h-[58%] overflow-y-auto rounded-t-3xl bg-surface/95 px-4 pb-5 pt-2 shadow-pop backdrop-blur-xl lg:inset-x-auto lg:bottom-auto lg:left-4 lg:top-4 lg:max-h-[calc(100%-2rem)] lg:w-[400px] lg:rounded-3xl lg:p-5"
+        className={`absolute inset-x-0 bottom-0 z-10 overflow-y-auto rounded-t-3xl transition-[max-height] duration-300 ease-[var(--ease-out-soft)] ${sheetTall ? 'max-h-[88%]' : 'max-h-[58%]'} bg-surface/95 px-4 pb-5 pt-2 shadow-pop backdrop-blur-xl lg:inset-x-auto lg:bottom-auto lg:left-4 lg:top-4 lg:max-h-[calc(100%-2rem)] lg:w-[400px] lg:rounded-3xl lg:p-5`}
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-line-strong lg:hidden" aria-hidden="true" />
+        <motion.button
+          type="button"
+          aria-label={sheetTall ? 'Shrink the planner' : 'Expand the planner'}
+          aria-expanded={sheetTall}
+          onClick={() => setSheetTall((t) => !t)}
+          onPanEnd={(_, info) => {
+            if (info.offset.y < -24) setSheetTall(true);
+            else if (info.offset.y > 24) setSheetTall(false);
+          }}
+          className="mx-auto mb-2 flex h-6 w-16 touch-none items-center justify-center lg:hidden"
+        >
+          <span className="h-1 w-10 rounded-full bg-line-strong" />
+        </motion.button>
         <h1 className="font-display text-xl font-bold tracking-tight">Where to?</h1>
         <p className="mt-0.5 text-[13px] text-muted">We rank every route by the air along the way.</p>
 

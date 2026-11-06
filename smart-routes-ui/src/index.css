@@ -139,6 +139,29 @@ body,
   }
 }
 
+/* The dot that travels the clean route on the sign-in illustration. */
+.route-runner {
+  offset-distance: 0%;
+  opacity: 0;
+  animation: route-run 4.5s var(--ease-out-soft) 1.9s infinite;
+}
+@keyframes route-run {
+  0% {
+    offset-distance: 0%;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    offset-distance: 100%;
+    opacity: 0;
+  }
+}
+
 /* Big numbers line up in both themes. */
 .font-data {
   font-variant-numeric: tabular-nums;
@@ -276,6 +299,7 @@ body,
 
 @media (prefers-reduced-motion: reduce) {
   .cw-pin,
+  .route-runner,
   .ring-arc,
   .air-strip,
   .cw-pin::after,

@@ -1,7 +1,8 @@
 import { useEffect, useId, useMemo, useRef } from 'react';
-import { animate, useReducedMotion } from 'motion/react';
+import { animate, motion, useReducedMotion } from 'motion/react';
 import { airStops } from '../lib/mapUtils';
 import Icon from './Icon';
+import { buttonClass } from './buttonStyles';
 import { formatScore, scoreBand } from '../lib/format';
 
 /** Air-quality score with its band name; colour is never the only signal. */
@@ -161,23 +162,13 @@ export function BandChip({ score }) {
   );
 }
 
-const BUTTON_VARIANTS = {
-  primary:
-    'bg-accent text-on-accent shadow-[0_1px_2px_rgb(0_0_0/0.12),inset_0_1px_0_rgb(255_255_255/0.14)] hover:bg-accent-hover disabled:bg-surface-2 disabled:text-faint disabled:shadow-none',
-  secondary:
-    'bg-surface text-ink shadow-card ring-1 ring-hairline hover:bg-surface-2 disabled:opacity-50',
-  dangerGhost: 'text-danger hover:bg-danger/10 hover:text-danger disabled:opacity-50',
-  ghost: 'text-muted hover:bg-surface-2 hover:text-ink disabled:opacity-50',
-  danger: 'bg-danger-solid text-white hover:bg-danger-solid/90 disabled:opacity-50',
-};
-
 export function Button({ variant = 'primary', loading, children, className = '', icon, ...props }) {
   return (
     <button
       type="button"
       {...props}
       disabled={props.disabled || loading}
-      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-[background-color,box-shadow,transform] duration-150 active:scale-[0.98] disabled:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed ${BUTTON_VARIANTS[variant]} ${className}`}
+      className={buttonClass(variant, className)}
     >
       {loading ? <Spinner className="h-4 w-4" /> : icon ? <Icon name={icon} className="h-4 w-4" /> : null}
       {children}
@@ -270,6 +261,43 @@ export function PageLoader({ label = 'Loading…' }) {
     <div className="flex h-full min-h-60 items-center justify-center gap-3 text-sm text-muted">
       <Spinner />
       {label}
+    </div>
+  );
+}
+
+/** Page title row: big title, a quiet line under it, and an optional action on the right. */
+export function PageHeader({ title, subtitle, action, children }) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div className="min-w-0">
+        {children}
+        <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-ink">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+      </div>
+      {action}
+    </header>
+  );
+}
+
+/** A row of choices with a white pill that slides to the chosen one. */
+export function Segmented({ options, value, onChange, label, id }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-xl bg-surface-2/80 p-1">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={`relative min-h-8 rounded-lg px-3 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent ${
+            value === o.value ? 'text-ink' : 'text-muted hover:text-ink'
+          }`}
+        >
+          {value === o.value && <motion.span layoutId={`seg-${id}`} className="absolute inset-0 rounded-lg bg-surface shadow-card" />}
+          <span className="relative">{o.label}</span>
+        </button>
+      ))}
     </div>
   );
 }

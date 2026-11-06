@@ -35,6 +35,7 @@ const step = (s) => console.log('-', s);
 step('redirect to login');
 await page.goto(BASE + '/');
 await page.waitForURL('**/login');
+await page.waitForTimeout(2500); // let the illustration finish drawing
 await shot('01-login');
 
 step('signup');
@@ -125,6 +126,10 @@ await page.setViewportSize({ width: 390, height: 844 });
 await page.goto(BASE + '/');
 await page.waitForTimeout(1500);
 await shot('10-mobile');
+await page.getByRole('button', { name: 'Expand the planner' }).click();
+await page.waitForTimeout(600);
+await shot('10a-mobile-expanded');
+await page.getByRole('button', { name: 'Shrink the planner' }).click();
 await flipTheme();
 await shot('10b-mobile-dark');
 await flipTheme();

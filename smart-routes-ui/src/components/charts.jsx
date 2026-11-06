@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { formatDateTime, formatHour, formatScore, scoreBand } from '../lib/format';
 import { useTheme } from '../context/contexts';
+import { prefersReducedMotion } from '../lib/mapUtils';
 
 // Recessive chart chrome for each theme; text uses ink colours, never series colours.
 const CHROME = {
@@ -31,7 +32,7 @@ function useChrome() {
 function TooltipBox({ title, score }) {
   const band = scoreBand(score);
   return (
-    <div className="rounded-lg border border-line-strong bg-surface/95 px-3 py-2 shadow-xl">
+    <div className="rounded-xl bg-surface/95 px-3 py-2 shadow-pop ring-1 ring-hairline backdrop-blur">
       <p className="text-xs text-muted">{title}</p>
       <p className="mt-0.5 flex items-center gap-2 text-sm font-semibold text-ink">
         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: band.color }} aria-hidden="true" />
@@ -87,7 +88,9 @@ export function ScoreTrendChart({ points, days }) {
           strokeWidth={2}
           dot={data.length < 30 ? { r: 3, fill: c.line, strokeWidth: 0 } : false}
           activeDot={{ r: 5, fill: c.line, stroke: c.surface, strokeWidth: 2 }}
-          isAnimationActive={false}
+          isAnimationActive={!prefersReducedMotion()}
+          animationDuration={900}
+          animationEasing="ease-out"
         />
       </LineChart>
     </ResponsiveContainer>
@@ -119,7 +122,7 @@ export function HourlyChart({ hourlyAverages, bestHour }) {
             ) : null
           }
         />
-        <Bar dataKey="score" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+        <Bar dataKey="score" radius={[4, 4, 0, 0]} isAnimationActive={!prefersReducedMotion()} animationDuration={700} animationEasing="ease-out">
           {data.map((d) => (
             <Cell key={d.hour} fill={scoreBand(d.score).color} fillOpacity={d.hour === bestHour ? 1 : 0.75} />
           ))}

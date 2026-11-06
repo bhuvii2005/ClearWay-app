@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { authApi, errorMessage } from '../lib/api';
 import { POLLUTANTS } from '../lib/format';
 import { useAuth, useToast } from '../context/contexts';
-import { Button, Card, ErrorNote, TextField, Toggle } from '../components/ui';
+import { Button, ErrorNote, PageHeader, TextField, Toggle } from '../components/ui';
+import Icon from '../components/Icon';
 
 const POLLUTANT_NOTES = {
   avoidPm25: 'Fine particles from traffic and burning; the most harmful for lungs and heart.',
@@ -11,30 +13,78 @@ const POLLUTANT_NOTES = {
   avoidOzone: 'Forms on sunny afternoons; can trigger breathing problems.',
 };
 
+const initials = (name = '') =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0].toUpperCase())
+    .join('') || '?';
+
 export default function AccountPage() {
+  const { user } = useAuth();
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-4 py-8 sm:px-6">
-      <h1 className="font-display text-2xl font-bold tracking-tight">Account</h1>
-      <ProfileSection />
-      <SensitivitySection />
-      <PasswordSection />
-      <SessionSection />
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-10">
+      <PageHeader title="Account" subtitle="Your profile, health settings and security." />
+      <div className="mt-8 flex items-center gap-4 rounded-3xl bg-surface p-5 shadow-card ring-1 ring-hairline">
+        <span className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-accent/15 font-display text-xl font-bold text-accent-ink">
+          {initials(user.name)}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-lg font-semibold text-ink">{user.name}</p>
+          <p className="truncate text-sm text-muted">{user.email}</p>
+        </div>
+      </div>
+      <div className="mt-10 space-y-10">
+        <ProfileSection />
+        <SensitivitySection />
+        <PasswordSection />
+        <SessionSection />
+      </div>
     </div>
   );
 }
 
-function SectionHeader({ title, children }) {
+/** Settings row: title and description on the left, the controls in a card on the right. */
+function Section({ title, description, children }) {
   return (
-    <div className="mb-4">
-      <h2 className="text-base font-semibold text-ink">{title}</h2>
-      {children && <p className="mt-1 text-sm text-muted">{children}</p>}
-    </div>
+    <section className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)] md:gap-8">
+      <div>
+        <h2 className="text-base font-semibold text-ink">{title}</h2>
+        {description && <p className="mt-1 text-sm leading-snug text-muted">{description}</p>}
+      </div>
+      <div className="rounded-3xl bg-surface p-5 shadow-card ring-1 ring-hairline sm:p-6">{children}</div>
+    </section>
+  );
+}
+
+/** A small "Saved" tick that appears after a save, then fades away. */
+function SavedTick({ show, onDone }) {
+  useEffect(() => {
+    if (!show) return undefined;
+    const t = setTimeout(onDone, 2000);
+    return () => clearTimeout(t);
+  }, [show, onDone]);
+  return (
+    <AnimatePresence>
+      {show && (
+        <motion.span
+          initial={{ opacity: 0, x: -4 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0 }}
+          className="inline-flex items-center gap-1 text-sm font-medium text-good"
+          role="status"
+        >
+          <Icon name="check" className="h-4 w-4" /> Saved
+        </motion.span>
+      )}
+    </AnimatePresence>
   );
 }
 
 function ProfileSection() {
   const { user, setUser } = useAuth();
-  const { push } = useToast();
+  const [saved, setSaved] = useState(false);
   const [name, setName] = useState(user.name ?? '');
   const [phone, setPhone] = useState(user.phone ?? '');
   const [busy, setBusy] = useState(false);
@@ -48,7 +98,7 @@ function ProfileSection() {
     try {
       const updated = await authApi.updateProfile({ name: name.trim(), phone: phone.trim() });
       setUser(updated);
-      push({ tone: 'success', title: 'Profile updated' });
+      setSaved(true);
     } catch (err) {
       setError(errorMessage(err, 'Could not update your profile.'));
     } finally {
@@ -57,8 +107,7 @@ function ProfileSection() {
   }
 
   return (
-    <Card>
-      <SectionHeader title="Profile" />
+    <Section title="Profile" description="How you appear in ClearWay.">
       <form onSubmit={save} className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField label="Name" required maxLength={100} value={name} onChange={(e) => setName(e.target.value)} />
@@ -66,11 +115,14 @@ function ProfileSection() {
         </div>
         <TextField label="Email" value={user.email} disabled hint="Your email is your sign-in and cannot be changed." />
         <ErrorNote>{error}</ErrorNote>
-        <Button type="submit" loading={busy} disabled={!changed || !name.trim()}>
-          Save changes
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button type="submit" loading={busy} disabled={!changed || !name.trim()}>
+            Save changes
+          </Button>
+          <SavedTick show={saved} onDone={() => setSaved(false)} />
+        </div>
       </form>
-    </Card>
+    </Section>
   );
 }
 
@@ -92,11 +144,8 @@ function SensitivitySection() {
   }
 
   return (
-    <Card>
-      <SectionHeader title="Pollutant sensitivities">
-        Routes with more of the pollutants you pick here are ranked lower, and their scores count those pollutants more heavily.
-      </SectionHeader>
-      <div className="divide-y divide-line">
+    <Section title="Sensitivities" description="Pick what affects you. Routes with more of it rank lower and score worse.">
+      <div className="-my-2 divide-y divide-line">
         {POLLUTANTS.map((p) => (
           <div key={p.pref} className="py-2.5">
             <Toggle
@@ -109,7 +158,7 @@ function SensitivitySection() {
           </div>
         ))}
       </div>
-    </Card>
+    </Section>
   );
 }
 
@@ -145,8 +194,7 @@ function PasswordSection() {
   }
 
   return (
-    <Card>
-      <SectionHeader title="Change password">Changing your password signs you out on every other device.</SectionHeader>
+    <Section title="Password" description="Changing it signs you out on every other device.">
       <form onSubmit={submit} className="space-y-4">
         <TextField
           label="Current password"
@@ -181,7 +229,7 @@ function PasswordSection() {
           Change password
         </Button>
       </form>
-    </Card>
+    </Section>
   );
 }
 
@@ -211,8 +259,7 @@ function SessionSection() {
   }
 
   return (
-    <Card>
-      <SectionHeader title="Sign out">Signing out ends your session on every device where you are signed in.</SectionHeader>
+    <Section title="Session" description="Signing out ends your session on every device.">
       <Button variant="secondary" icon="logout" loading={signingOut} onClick={signOut}>
         Sign out everywhere
       </Button>
@@ -220,8 +267,16 @@ function SessionSection() {
       <div className="mt-6 border-t border-line pt-5">
         <h3 className="text-sm font-semibold text-danger">Delete account</h3>
         <p className="mt-1 text-sm text-muted">Permanently removes your account, saved routes, their history and your alerts. This cannot be undone.</p>
-        {showDelete ? (
-          <form onSubmit={destroy} className="mt-4 space-y-3">
+        <AnimatePresence initial={false} mode="wait">
+          {showDelete ? (
+          <motion.form
+            key="confirm"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            onSubmit={destroy}
+            className="space-y-3 overflow-hidden pt-4"
+          >
             <TextField
               label={`Type DELETE to confirm deleting ${user.email}`}
               value={confirmText}
@@ -242,13 +297,16 @@ function SessionSection() {
                 Cancel
               </Button>
             </div>
-          </form>
+          </motion.form>
         ) : (
-          <Button variant="dangerGhost" className="mt-3" onClick={() => setShowDelete(true)}>
-            Delete account…
-          </Button>
+          <motion.div key="ask" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Button variant="dangerGhost" className="-ml-3 mt-3" onClick={() => setShowDelete(true)}>
+              Delete account…
+            </Button>
+          </motion.div>
         )}
+        </AnimatePresence>
       </div>
-    </Card>
+    </Section>
   );
 }
