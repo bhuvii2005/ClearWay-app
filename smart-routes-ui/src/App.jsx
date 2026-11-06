@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/contexts';
 import AlertsProvider from './context/AlertsProvider';
@@ -12,6 +12,7 @@ const RoutesPage = lazy(() => import('./pages/RoutesPage'));
 const RouteDetailPage = lazy(() => import('./pages/RouteDetailPage'));
 const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const AccountPage = lazy(() => import('./pages/AccountPage'));
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 
 function RequireAuth({ children }) {
   const { status } = useAuth();
@@ -24,6 +25,14 @@ function RequireAuth({ children }) {
     );
   }
   if (status !== 'authenticated') {
+    // Signed-out visitors to the home page see what ClearWay is; anywhere else asks them to sign in.
+    if (location.pathname === '/') {
+      return (
+        <Suspense fallback={<div className="h-dvh bg-canvas" />}>
+          <LandingPage />
+        </Suspense>
+      );
+    }
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
   return children;

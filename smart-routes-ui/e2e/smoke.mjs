@@ -32,8 +32,19 @@ const flipTheme = async () => {
 };
 const step = (s) => console.log('-', s);
 
-step('redirect to login');
+step('landing page');
 await page.goto(BASE + '/');
+await page.getByRole('heading', { name: /The cleanest way there/ }).waitFor();
+await page.waitForTimeout(2500);
+await shot('00-landing');
+for (const id of ['how', 'features', 'data']) {
+  await page.locator(`#${id}`).scrollIntoViewIfNeeded();
+  await page.waitForTimeout(1200);
+}
+await page.screenshot({ path: path.join(OUT, '00-landing-full.png'), fullPage: true });
+
+step('private pages redirect to login');
+await page.goto(BASE + '/routes');
 await page.waitForURL('**/login');
 await page.waitForTimeout(2500); // let the illustration finish drawing
 await shot('01-login');
