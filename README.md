@@ -21,7 +21,7 @@ ClearWay finds walking, jogging, cycling and driving routes with cleaner air. It
 |---|---|
 | Web app | React 19, Vite 7, React Router 7, Tailwind CSS 4, MapLibre GL (OpenFreeMap tiles), Motion, Lucide icons, Recharts, STOMP over SockJS |
 | API | Java 17, Spring Boot 4, Spring Security, Hibernate Spatial, Resilience4j, Caffeine |
-| Database | PostgreSQL 15 with PostGIS, Flyway migrations |
+| Database | PostgreSQL 15 with PostGIS and pgvector (image built from `db/Dockerfile`), Flyway migrations |
 | Tooling | Docker Compose, GitHub Actions, JUnit 5 + Testcontainers, Vitest, Playwright smoke test |
 
 Every external service used is free and needs at most a free key (only TomTom).
@@ -81,7 +81,7 @@ The API reads the root `.env` automatically. On Windows, if Java 17 is not the d
 
 | Command | What it checks |
 |---|---|
-| `cd smart-routes-api && ./gradlew test` | 34 tests: services, security, and full API + WebSocket flows against a throwaway PostGIS container (needs Docker running) |
+| `cd smart-routes-api && ./gradlew test` | 35 tests: services, security, and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
 | `cd smart-routes-ui && npm test` | Air-quality bands, wording, and the API client |
 | `cd smart-routes-ui && npm run lint` | Code style and React rules |
 | `cd smart-routes-ui && npm run e2e` | Full browser journey against a running app (set `E2E_BASE_URL=http://localhost:4173` for the Docker version) |
@@ -92,7 +92,7 @@ Tests never use your real database or API keys: outside services are mocked and 
 
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every push and pull request:
 
-1. **API:** build and all backend tests, using a throwaway PostGIS container.
+1. **API:** build and all backend tests, using a throwaway database container built from `db/Dockerfile`.
 2. **Web app:** lint, unit tests and production build.
 3. **Docker:** checks `docker-compose.yml` and builds both images (nothing is pushed or deployed).
 
@@ -120,6 +120,7 @@ All endpoints except sign-up, login and health need `Authorization: Bearer <toke
 ## Project structure
 
 ```
+db/Dockerfile             Database image: PostGIS plus pgvector
 docker-compose.yml        Database, API and web app
 .env.example              Settings template (placeholders only)
 .github/workflows/ci.yml  Build and test on every push

@@ -18,6 +18,17 @@ repositories {
 	mavenCentral()
 }
 
+// Spring AI versions are managed in one place by its BOM; never pin single Spring AI artifacts.
+ext {
+	springAiVersion = '2.0.2'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+	}
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'

@@ -7,7 +7,9 @@
 
 services:
   db:
-    image: postgis/postgis:15-3.4
+    # PostGIS 15-3.4 plus pgvector, built from db/Dockerfile (tests use the same file).
+    build: ./db
+    image: clearway-db:local
     container_name: cleanroute-db
     env_file: .env              # POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
     ports:

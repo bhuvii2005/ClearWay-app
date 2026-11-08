@@ -1,6 +1,7 @@
 package com.cleanroute.api;
 
 import com.cleanroute.api.config.JwtTokenProvider;
+import com.cleanroute.api.support.TestDatabase;
 import com.cleanroute.api.entity.Notification;
 import com.cleanroute.api.entity.Route;
 import com.cleanroute.api.entity.User;
@@ -27,7 +28,6 @@ import org.springframework.web.socket.sockjs.client.WebSocketTransport;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 import java.lang.reflect.Type;
 import java.util.List;
@@ -50,8 +50,7 @@ class WebSocketAlertsIntegrationTest {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer postgis = new PostgreSQLContainer(
-            DockerImageName.parse("postgis/postgis:15-3.4").asCompatibleSubstituteFor("postgres"));
+    static PostgreSQLContainer postgis = TestDatabase.newContainer();
 
     @LocalServerPort
     int port;
