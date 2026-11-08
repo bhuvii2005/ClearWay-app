@@ -2,6 +2,7 @@ package com.cleanroute.api.config;
 
 import com.cleanroute.api.dto.ErrorResponse;
 import com.cleanroute.api.exception.ApiException;
+import com.cleanroute.api.exception.RateLimitedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -27,7 +28,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApiException(ApiException ex) {
-        return build(ex.getStatus(), ex.getMessage());
+        ResponseEntity<ErrorResponse> response = build(ex.getStatus(), ex.getMessage());
+        if (ex instanceof RateLimitedException limited) {
+            return ResponseEntity.status(response.getStatusCode())
+                    .header("Retry-After", String.valueOf(limited.getRetryAfterSeconds()))
+                    .body(response.getBody());
+        }
+        return response;
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

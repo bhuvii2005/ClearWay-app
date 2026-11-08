@@ -18,6 +18,20 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+  # ClearWay builds its AI clients itself (com.cleanroute.api.ai), so a missing key turns the Coach
+  # off with a 503 instead of stopping the app. Spring AI's own model auto-setup is therefore off.
+  autoconfigure:
+    # This one ignores the switches below and insists on a key at start-up.
+    exclude: org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
+  ai:
+    model:
+      chat: none
+      embedding: none
+      embedding.text: none
+      image: none
+      audio.speech: none
+      audio.transcription: none
+      moderation: none
   cache:
     cache-names: aqi
     caffeine:
@@ -49,6 +63,35 @@ alerts:
   poor-threshold: 75        # European AQI above this triggers a POOR_AIR alert
   cooldown-minutes: 120     # at most one alert per route in this window
 
+# ClearWay Coach (AI). Free hosted tiers only; keys come from .env and are never written here.
+# With no key for the chosen provider the Coach answers 503 and the rest of the app runs normally.
+clearway:
+  ai:
+    enabled: ${CLEARWAY_AI_ENABLED:true}
+    chat:
+      provider: ${CLEARWAY_AI_CHAT_PROVIDER:groq}   # groq | gemini
+      temperature: 0.2
+      max-output-tokens: 800
+      timeout: 30s
+    providers:
+      # Both use their OpenAI-compatible endpoints. Model names change; check each provider's docs.
+      groq:
+        api-key: ${GROQ_API_KEY:}
+        base-url: https://api.groq.com/openai/v1
+        chat-model: ${GROQ_CHAT_MODEL:openai/gpt-oss-20b}
+      gemini:
+        api-key: ${GEMINI_API_KEY:}
+        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
+        chat-model: ${GEMINI_CHAT_MODEL:gemini-3.8-flash}
+    embedding:
+      model: gemini-embedding-001
+      dimensions: 768
+    limits:
+      messages-per-hour: 20         # per user
+      max-input-chars: 2000
+      daily-token-budget: 150000    # hosted tokens per day (UTC); Groq's free tier allows 200K for gpt-oss-20b
+      max-retry-wait: 20s           # a longer Retry-After from the provider means answer 503 straight away
+
 security:
   auth-rate-limit:
     per-minute: 10          # login/signup attempts per IP per minute
@@ -65,6 +108,16 @@ resilience4j:
           - com.cleanroute.api.exception.ApiException
           - org.springframework.web.client.HttpClientErrorException
       openMeteo: *cb
+      llm:
+        sliding-window-size: 10
+        minimum-number-of-calls: 4
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+  bulkhead:
+    instances:
+      llm:
+        max-concurrent-calls: 4     # at most 4 AI calls at once across all users
+        max-wait-duration: 2s
   retry:
     instances:
       tomtom: &retry
