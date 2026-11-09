@@ -30,8 +30,8 @@ class LlmGatewayLiveTest {
 
             assertThat(first).isNotBlank();
             assertThat(second).isNotBlank();
-            assertThat(tally.requests()).isGreaterThanOrEqualTo(2);
-            assertThat(tally.tokens()).isPositive();
+            assertThat(tally.chatRequests()).isGreaterThanOrEqualTo(2);
+            assertThat(tally.chatTokens()).isPositive();
         }
         assertThat(budget.requestsToday()).isGreaterThanOrEqualTo(2);
     }

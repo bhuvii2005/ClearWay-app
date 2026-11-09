@@ -3,24 +3,22 @@ package com.cleanroute.api.ai;
 import com.cleanroute.api.exception.ApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 
 /**
- * Caps what the app spends on hosted AI per day: provider requests AND tokens, both from config.
- * The day ends at midnight in {@code clearway.ai.limits.budget-reset-zone} (Pacific by default,
- * when Gemini's free daily quota resets). In memory, so it resets on restart; the provider's own
- * limit is the hard backstop.
+ * Caps what the app spends on one hosted AI quota per day: provider requests and tokens, both from
+ * config. Chat and embeddings each get their own budget, because Gemini gives each model its own
+ * free quota. The day ends at midnight in the clock's zone ({@code clearway.ai.limits.budget-reset-zone},
+ * Pacific by default, when Gemini's free daily quota resets). In memory, so it resets on restart;
+ * the provider's own limit is the hard backstop.
  */
-@Component
 public class HostedAiBudget {
 
     private static final Logger log = LoggerFactory.getLogger(HostedAiBudget.class);
 
+    private final String name;
     private final long maxRequests;
     private final long maxTokens;
     private final Clock clock;
@@ -29,18 +27,17 @@ public class HostedAiBudget {
     private long tokens;
     private boolean warned;
 
-    @Autowired
-    public HostedAiBudget(AiProperties properties) {
-        this(properties.limits().dailyRequestBudget(), properties.limits().dailyTokenBudget(),
-                Clock.system(properties.limits().budgetResetZone()));
-    }
-
     /** The clock's zone decides when the day rolls over. */
-    HostedAiBudget(long maxRequests, long maxTokens, Clock clock) {
+    public HostedAiBudget(String name, long maxRequests, long maxTokens, Clock clock) {
+        this.name = name;
         this.maxRequests = maxRequests;
         this.maxTokens = maxTokens;
         this.clock = clock;
         this.day = today();
+    }
+
+    HostedAiBudget(long maxRequests, long maxTokens, Clock clock) {
+        this("test", maxRequests, maxTokens, clock);
     }
 
     /** Throws 503 once today's request or token budget is used up. */
@@ -48,8 +45,8 @@ public class HostedAiBudget {
         rollOver();
         if (requests >= maxRequests || tokens >= maxTokens) {
             if (!warned) {
-                log.warn("Daily hosted AI budget used up ({}/{} requests, {}/{} tokens); the Coach is off until midnight {}.",
-                        requests, maxRequests, tokens, maxTokens, zone());
+                log.warn("Daily hosted AI {} budget used up ({}/{} requests, {} tokens); AI {} is off until midnight {}.",
+                        name, requests, maxRequests, tokens, name, clock.getZone());
                 warned = true;
             }
             throw ApiException.serviceUnavailable(
@@ -92,9 +89,5 @@ public class HostedAiBudget {
 
     private LocalDate today() {
         return LocalDate.now(clock);
-    }
-
-    private ZoneId zone() {
-        return clock.getZone();
     }
 }

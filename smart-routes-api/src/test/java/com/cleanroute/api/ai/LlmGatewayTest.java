@@ -69,15 +69,16 @@ class LlmGatewayTest {
         try (AiUsageTally tally = AiUsageTally.open("test message")) {
             gateway.call(PROMPT);           // 1 request, 10 tokens
             gateway.call(PROMPT);           // 429 then retry: 2 requests, 10 tokens
-            assertThat(tally.requests()).isEqualTo(3);
-            assertThat(tally.tokens()).isEqualTo(20);
+            assertThat(tally.chatRequests()).isEqualTo(3);
+            assertThat(tally.chatTokens()).isEqualTo(20);
+            assertThat(tally.embeddingRequests()).isZero();
         }
         assertThat(budget.requestsToday()).isEqualTo(3);
 
         // Outside a tally the gateway still works, and nothing is left on the thread.
         gateway.call(PROMPT);
         try (AiUsageTally next = AiUsageTally.open("next message")) {
-            assertThat(next.requests()).isZero();
+            assertThat(next.chatRequests()).isZero();
         }
     }
 

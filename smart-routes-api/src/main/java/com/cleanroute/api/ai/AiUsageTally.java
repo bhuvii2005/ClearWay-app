@@ -5,8 +5,9 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Adds up the provider requests and tokens behind one piece of work, such as one Coach message
- * (which is several LLM calls: tool rounds plus the final answer). {@link LlmGateway} records
- * into the tally open on the current thread; closing it logs the totals (no user text).
+ * (which is several LLM calls: tool rounds plus the final answer, and an embedding request per
+ * knowledge-base search). {@link LlmGateway} and {@link EmbeddingGateway} record into the tally
+ * open on the current thread; closing it logs the totals (no user text).
  *
  * <pre>
  * try (AiUsageTally tally = AiUsageTally.open("coach message")) {
@@ -21,8 +22,9 @@ public final class AiUsageTally implements AutoCloseable {
 
     private final String label;
     private final AiUsageTally outer;
-    private int requests;
-    private long tokens;
+    private int chatRequests;
+    private long chatTokens;
+    private int embeddingRequests;
 
     private AiUsageTally(String label, AiUsageTally outer) {
         this.label = label;
@@ -35,27 +37,37 @@ public final class AiUsageTally implements AutoCloseable {
         return tally;
     }
 
-    static void recordRequest() {
+    static void recordChatRequest() {
         for (AiUsageTally t = CURRENT.get(); t != null; t = t.outer) {
-            t.requests++;
+            t.chatRequests++;
         }
     }
 
-    static void recordTokens(long count) {
+    static void recordChatTokens(long count) {
         if (count <= 0) {
             return;
         }
         for (AiUsageTally t = CURRENT.get(); t != null; t = t.outer) {
-            t.tokens += count;
+            t.chatTokens += count;
         }
     }
 
-    public int requests() {
-        return requests;
+    static void recordEmbeddingRequest() {
+        for (AiUsageTally t = CURRENT.get(); t != null; t = t.outer) {
+            t.embeddingRequests++;
+        }
     }
 
-    public long tokens() {
-        return tokens;
+    public int chatRequests() {
+        return chatRequests;
+    }
+
+    public long chatTokens() {
+        return chatTokens;
+    }
+
+    public int embeddingRequests() {
+        return embeddingRequests;
     }
 
     @Override
@@ -65,6 +77,7 @@ public final class AiUsageTally implements AutoCloseable {
         } else {
             CURRENT.set(outer);
         }
-        log.info("AI usage for {}: {} requests, {} tokens", label, requests, tokens);
+        log.info("AI usage for {}: {} chat requests, {} chat tokens, {} embedding requests",
+                label, chatRequests, chatTokens, embeddingRequests);
     }
 }

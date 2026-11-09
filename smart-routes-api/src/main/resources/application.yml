@@ -83,9 +83,18 @@ clearway:
         api-key: ${GROQ_API_KEY:}
         base-url: https://api.groq.com/openai/v1
         chat-model: ${GROQ_CHAT_MODEL:openai/gpt-oss-20b}
-    embedding:
+    embedding:                    # always Gemini (one key with chat); its free quota is separate from chat
       model: gemini-embedding-001
-      dimensions: 768
+      dimensions: 768               # V6 creates vector(768); changing this needs a new migration
+      timeout: 20s
+      daily-request-budget: ${CLEARWAY_AI_EMBED_DAILY_REQUESTS:500}   # placeholder until the AI Studio numbers
+    kb:
+      ingest-on-startup: ${CLEARWAY_AI_KB_INGEST_ON_STARTUP:true}
+      top-k: 4
+      similarity-threshold: ${CLEARWAY_AI_KB_SIMILARITY_THRESHOLD:0.6}
+      chunk-size-tokens: 300
+      batch-size: 20                # chunks per embedding request
+      embed-requests-per-minute: ${CLEARWAY_AI_EMBED_RPM:30}          # ingestion spaces batches 60s / this apart
     limits:
       messages-per-hour: 20         # per user
       max-input-chars: 2000
@@ -118,10 +127,18 @@ resilience4j:
         minimum-number-of-calls: 4
         failure-rate-threshold: 50
         wait-duration-in-open-state: 60s
+      embedding:
+        sliding-window-size: 10
+        minimum-number-of-calls: 4
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
   bulkhead:
     instances:
       llm:
         max-concurrent-calls: 4     # at most 4 AI calls at once across all users
+        max-wait-duration: 2s
+      embedding:
+        max-concurrent-calls: 4
         max-wait-duration: 2s
   retry:
     instances:

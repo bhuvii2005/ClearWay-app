@@ -46,6 +46,8 @@ dependencies {
 	// AI: Gemini chat (default) or Groq through the OpenAI-compatible module, Gemini for embeddings (versions from the Spring AI BOM)
 	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
+	// Knowledge base: the plain PgVectorStore module (no auto-config; ClearWay builds the store itself)
+	implementation 'org.springframework.ai:spring-ai-pgvector-store'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'

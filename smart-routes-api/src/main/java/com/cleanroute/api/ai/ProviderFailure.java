@@ -1,5 +1,7 @@
 package com.cleanroute.api.ai;
 
+import com.google.genai.errors.ApiException;
+import com.google.genai.errors.GenAiIOException;
 import com.openai.errors.OpenAIIoException;
 import com.openai.errors.OpenAIServiceException;
 import org.springframework.web.client.RestClientResponseException;
@@ -7,6 +9,8 @@ import org.springframework.web.client.RestClientResponseException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * What went wrong in a call to an AI provider, in provider-neutral terms.
@@ -15,6 +19,10 @@ import java.util.Optional;
  * @param retryAfter how long the provider asked us to wait, when it said so
  */
 public record ProviderFailure(int status, Optional<Duration> retryAfter) {
+
+    /** Gemini's SDK has no Retry-After header; its 429 says "Please retry in 17.5s." or "retryDelay": "17s". */
+    private static final Pattern GEMINI_RETRY_DELAY =
+            Pattern.compile("(?i)(?:retry in|\"retryDelay\"\\s*:\\s*\")\\s*([0-9]+(?:\\.[0-9]+)?)\\s*s");
 
     public boolean rateLimited() {
         return status == 429;
@@ -35,7 +43,10 @@ public record ProviderFailure(int status, Optional<Duration> retryAfter) {
                 var values = e.getResponseHeaders() == null ? List.<String>of() : e.getResponseHeaders().getOrEmpty("Retry-After");
                 return new ProviderFailure(e.getStatusCode().value(), retryAfter(values));
             }
-            if (t instanceof OpenAIIoException) {
+            if (t instanceof ApiException e) {
+                return new ProviderFailure(e.code(), geminiRetryDelay(e.getMessage()));
+            }
+            if (t instanceof OpenAIIoException || t instanceof GenAiIOException) {
                 return new ProviderFailure(0, Optional.empty());
             }
         }
@@ -53,5 +64,13 @@ public record ProviderFailure(int status, Optional<Duration> retryAfter) {
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
+    }
+
+    static Optional<Duration> geminiRetryDelay(String message) {
+        if (message == null) {
+            return Optional.empty();
+        }
+        Matcher m = GEMINI_RETRY_DELAY.matcher(message);
+        return m.find() ? retryAfter(List.of(m.group(1))) : Optional.empty();
     }
 }

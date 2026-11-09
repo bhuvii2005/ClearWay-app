@@ -39,4 +39,17 @@ class ProviderFailureTest {
         assertThat(ProviderFailure.retryAfter(List.of("-1"))).isEqualTo(Optional.empty());
         assertThat(ProviderFailure.retryAfter(List.of(" 7 "))).contains(Duration.ofSeconds(7));
     }
+
+    @Test
+    void readsStatusAndRetryDelayFromGeminiSdkErrors() {
+        var quota = new com.google.genai.errors.ClientException(429, "RESOURCE_EXHAUSTED",
+                "You exceeded your current quota. Please retry in 17.5s.");
+        ProviderFailure failure = ProviderFailure.of(new RuntimeException("wrapped", quota));
+
+        assertThat(failure.rateLimited()).isTrue();
+        assertThat(failure.retryAfter()).contains(Duration.ofMillis(17_500));
+        assertThat(ProviderFailure.geminiRetryDelay("{\"retryDelay\": \"9s\"}")).contains(Duration.ofSeconds(9));
+        assertThat(ProviderFailure.of(new com.google.genai.errors.ServerException(503, "UNAVAILABLE", "overloaded")).retryable()).isTrue();
+        assertThat(ProviderFailure.of(new com.google.genai.errors.GenAiIOException("timeout")).status()).isZero();
+    }
 }

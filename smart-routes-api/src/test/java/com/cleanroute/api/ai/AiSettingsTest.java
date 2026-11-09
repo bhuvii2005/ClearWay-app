@@ -29,6 +29,14 @@ class AiSettingsTest {
                     "clearway.ai.providers.gemini.chat-model=gemini-3.8-flash",
                     "clearway.ai.embedding.model=gemini-embedding-001",
                     "clearway.ai.embedding.dimensions=768",
+                    "clearway.ai.embedding.timeout=20s",
+                    "clearway.ai.embedding.daily-request-budget=500",
+                    "clearway.ai.kb.ingest-on-startup=true",
+                    "clearway.ai.kb.top-k=4",
+                    "clearway.ai.kb.similarity-threshold=0.6",
+                    "clearway.ai.kb.chunk-size-tokens=300",
+                    "clearway.ai.kb.batch-size=20",
+                    "clearway.ai.kb.embed-requests-per-minute=30",
                     "clearway.ai.limits.messages-per-hour=20",
                     "clearway.ai.limits.max-input-chars=2000",
                     "clearway.ai.limits.daily-request-budget=200",
@@ -81,6 +89,9 @@ class AiSettingsTest {
         runner.withPropertyValues("clearway.ai.limits.messages-per-hour=0").run(ctx -> assertThat(ctx).hasFailed());
         runner.withPropertyValues("clearway.ai.limits.daily-request-budget=0").run(ctx -> assertThat(ctx).hasFailed());
         runner.withPropertyValues("clearway.ai.limits.budget-reset-zone=Mars/Olympus").run(ctx -> assertThat(ctx).hasFailed());
+        runner.withPropertyValues("clearway.ai.kb.similarity-threshold=1.5").run(ctx -> assertThat(ctx).hasFailed());
+        runner.withPropertyValues("clearway.ai.kb.batch-size=0").run(ctx -> assertThat(ctx).hasFailed());
+        runner.withPropertyValues("clearway.ai.embedding.daily-request-budget=0").run(ctx -> assertThat(ctx).hasFailed());
     }
 
     @Test
@@ -93,10 +104,30 @@ class AiSettingsTest {
     void health_IsUpEvenWhenCoachIsOff() {
         LlmGateway off = new LlmGateway(Optional.empty(), new HostedAiBudget(10, 10, Clock.systemUTC()),
                 CircuitBreaker.ofDefaults("llm"), Bulkhead.ofDefaults("llm"), Duration.ofSeconds(20), d -> { });
+        EmbeddingService noEmbeddings = new EmbeddingService(AiTestSettings.withKnowledgeBase(0.6, 20, 30),
+                Optional.empty(), Optional.empty(), CircuitBreaker.ofDefaults("e"), Bulkhead.ofDefaults("e"), d -> { });
 
-        var health = new AiHealthIndicator(off).health();
+        var health = new AiHealthIndicator(off, noEmbeddings).health();
 
         assertThat(health.getStatus()).isEqualTo(Status.UP);
-        assertThat(health.getDetails()).containsEntry("coachAvailable", false).containsKey("reason");
+        assertThat(health.getDetails()).containsEntry("coachAvailable", false).containsKey("reason")
+                .containsEntry("knowledgeBaseAvailable", false);
+    }
+
+    @Test
+    void geminiKey_BuildsBothEmbeddingModelsWithoutCallingThem_EvenWhenChatUsesGroq() {
+        var settings = AiTestSettings.forProvider(AiProperties.Provider.GROQ, "test-key-not-real", AiTestSettings.GROQ_URL, Duration.ofSeconds(5));
+        var withGeminiKey = new AiProperties(true, settings.chat(),
+                new AiProperties.Providers(settings.providers().groq(),
+                        new AiProperties.ProviderSettings("test-key-not-real", AiTestSettings.GEMINI_URL, "gemini-3.8-flash")),
+                settings.embedding(), settings.kb(), settings.limits());
+
+        EmbeddingService service = new EmbeddingService(withGeminiKey,
+                io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.ofDefaults(),
+                io.github.resilience4j.bulkhead.BulkheadRegistry.ofDefaults());
+
+        assertThat(service.isConfigured()).isTrue();
+        assertThat(service.forDocuments().orElseThrow().dimensions()).isEqualTo(768);
+        assertThat(service.model()).isEqualTo("gemini-embedding-001");
     }
 }

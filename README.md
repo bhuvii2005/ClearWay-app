@@ -48,7 +48,9 @@ Then replace each `change_me_...` placeholder in `.env`:
 
 Never commit `.env` or put real values in `.env.example`.
 
-**AI free-tier limits.** Gemini's free limits are per project and per model (requests per minute, tokens per minute, requests per day) and reset at midnight Pacific. The app keeps its own daily cap of requests and tokens below them, set with `CLEARWAY_AI_DAILY_REQUESTS` and `CLEARWAY_AI_DAILY_TOKENS`; once it's reached, the Coach answers 503 until midnight Pacific. One Coach message can take several requests, and the API logs the requests and tokens each message used. If the provider answers 429, the API retries once after the wait it asks for, then answers 503.
+**AI free-tier limits.** Gemini's free limits are per project and per model (requests per minute, tokens per minute, requests per day) and reset at midnight Pacific. The app keeps its own daily cap of requests and tokens below them, set with `CLEARWAY_AI_DAILY_REQUESTS` and `CLEARWAY_AI_DAILY_TOKENS`; once it's reached, the Coach answers 503 until midnight Pacific. One Coach message can take several requests, and the API logs the chat requests, tokens and embedding requests each message used. Embeddings have their own Gemini quota and their own daily cap (`CLEARWAY_AI_EMBED_DAILY_REQUESTS`). If the provider answers 429, the API retries once after the wait it asks for, then answers 503.
+
+**Coach knowledge base.** Five short guidance files in [`smart-routes-api/src/main/resources/kb/`](smart-routes-api/src/main/resources/kb/) (WHO guideline levels, European AQI bands, health effects, exercising in poor air, how ClearWay scores routes) are embedded with Gemini and stored in the `vector_store` table (migration V6, pgvector). This happens in the background at start-up, and only for files that are new or changed, so a normal restart uses no embedding requests. Each file is stored all-or-nothing: if Gemini answers 429 partway through, that file is left as it was and is retried on the next start-up. Without `GEMINI_API_KEY` the knowledge base is simply off.
 
 ### 2a. Run everything with Docker (easiest)
 
@@ -85,8 +87,8 @@ The API reads the root `.env` automatically. On Windows, if Java 17 is not the d
 
 | Command | What it checks |
 |---|---|
-| `cd smart-routes-api && ./gradlew test` | 64 tests: services, security, the AI gateway and limits (fake models, no network), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
-| `cd smart-routes-api && ./gradlew evalTest` | Live AI checks against Gemini (or Groq with `CLEARWAY_EVAL_PROVIDER=groq`). Skipped when the key isn't set. They use their own small budget (`CLEARWAY_EVAL_MAX_REQUESTS`, default 20; `CLEARWAY_EVAL_MAX_TOKENS`, default 20,000) and space calls to stay under `CLEARWAY_EVAL_RPM` (default 5 a minute). Never part of `build` |
+| `cd smart-routes-api && ./gradlew test` | 77 tests: services, security, the AI gateway, limits and knowledge base (fake models, no network), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
+| `cd smart-routes-api && ./gradlew evalTest` | Live AI checks against Gemini, including a knowledge-base search for "safe PM2.5 level" (or Groq with `CLEARWAY_EVAL_PROVIDER=groq`). Skipped when the key isn't set. They use their own small budget (`CLEARWAY_EVAL_MAX_REQUESTS`, default 20; `CLEARWAY_EVAL_MAX_TOKENS`, default 20,000) and space calls to stay under `CLEARWAY_EVAL_RPM` (default 5 a minute). Never part of `build` |
 | `cd smart-routes-ui && npm test` | Air-quality bands, wording, and the API client |
 | `cd smart-routes-ui && npm run lint` | Code style and React rules |
 | `cd smart-routes-ui && npm run e2e` | Full browser journey against a running app (set `E2E_BASE_URL=http://localhost:4173` for the Docker version) |

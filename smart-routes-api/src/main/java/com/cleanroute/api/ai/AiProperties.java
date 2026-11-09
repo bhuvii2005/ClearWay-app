@@ -25,6 +25,7 @@ public record AiProperties(
         @NotNull @Valid Chat chat,
         @NotNull @Valid Providers providers,
         @NotNull @Valid Embedding embedding,
+        @NotNull @Valid KnowledgeBase kb,
         @NotNull @Valid Limits limits) {
 
     public enum Provider { GROQ, GEMINI }
@@ -62,7 +63,26 @@ public record AiProperties(
         }
     }
 
-    public record Embedding(@NotBlank String model, @Min(1) @Max(2000) int dimensions) {
+    /** Gemini embeddings (always Gemini, whichever chat provider is chosen), with their own daily quota. */
+    public record Embedding(
+            @NotBlank String model,
+            @Min(1) @Max(2000) int dimensions,
+            @NotNull Duration timeout,
+            @Min(1) long dailyRequestBudget) {
+
+        public Embedding {
+            requirePositive(timeout, "clearway.ai.embedding.timeout");
+        }
+    }
+
+    /** The small knowledge base the Coach searches (Markdown files under classpath:kb/). */
+    public record KnowledgeBase(
+            boolean ingestOnStartup,
+            @Min(1) @Max(20) int topK,
+            @DecimalMin("0.0") @DecimalMax("1.0") double similarityThreshold,
+            @Min(50) @Max(2000) int chunkSizeTokens,
+            @Min(1) @Max(100) int batchSize,
+            @Min(1) int embedRequestsPerMinute) {
     }
 
     public record Limits(
