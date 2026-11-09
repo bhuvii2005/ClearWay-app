@@ -20,16 +20,19 @@ import reactor.core.publisher.Flux;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The only way into a chat model. It wraps the provider's model and is itself a {@link ChatModel},
  * so Spring AI's ChatClient (and its tool loop) sends every round trip through here. Each call gets:
  * <ul>
- *   <li>the daily hosted token budget ({@link HostedTokenBudget}),</li>
+ *   <li>the daily hosted budget of requests and tokens ({@link HostedAiBudget}),</li>
  *   <li>a bulkhead "llm" (at most a few calls at once, so one burst can't use the whole free tier),</li>
- *   <li>a circuit breaker "llm" (stop calling a provider that keeps failing),</li>
+ *   <li>a circuit breaker "llm" (stop calling a provider that keeps failing; a 429 is the free
+ *       limit doing its job, not a broken provider, so it never counts as a failure),</li>
  *   <li>one retry, only on 429 or 5xx, waiting as long as Retry-After says (up to a cap).</li>
  * </ul>
+ * Every request sent and every token used is also added to the caller's {@link AiUsageTally}.
  * Any provider failure becomes {@code ApiException(503)}; it never leaks provider details or keys.
  */
 @Component
@@ -46,20 +49,20 @@ public class LlmGateway implements ChatModel {
     }
 
     private final Optional<ProviderChatModel> model;
-    private final HostedTokenBudget budget;
+    private final HostedAiBudget budget;
     private final CircuitBreaker circuitBreaker;
     private final Bulkhead bulkhead;
     private final Duration maxRetryWait;
     private final Sleeper sleeper;
 
     @Autowired
-    public LlmGateway(ChatModelFactory factory, HostedTokenBudget budget, CircuitBreakerRegistry circuitBreakers,
+    public LlmGateway(ChatModelFactory factory, HostedAiBudget budget, CircuitBreakerRegistry circuitBreakers,
                       BulkheadRegistry bulkheads, AiProperties properties) {
         this(factory.create(), budget, circuitBreakers.circuitBreaker("llm"), bulkheads.bulkhead("llm"),
                 properties.limits().maxRetryWait(), duration -> Thread.sleep(duration.toMillis()));
     }
 
-    LlmGateway(Optional<ProviderChatModel> model, HostedTokenBudget budget, CircuitBreaker circuitBreaker,
+    LlmGateway(Optional<ProviderChatModel> model, HostedAiBudget budget, CircuitBreaker circuitBreaker,
                Bulkhead bulkhead, Duration maxRetryWait, Sleeper sleeper) {
         this.model = model;
         this.budget = budget;
@@ -94,9 +97,7 @@ public class LlmGateway implements ChatModel {
 
         ChatResponse response;
         try {
-            response = Bulkhead.decorateSupplier(bulkhead,
-                    CircuitBreaker.decorateSupplier(circuitBreaker,
-                            () -> callWithOneRetry(target.chatModel(), prompt))).get();
+            response = Bulkhead.decorateSupplier(bulkhead, () -> withCircuitBreaker(target.chatModel(), prompt)).get();
         } catch (BulkheadFullException e) {
             throw ApiException.serviceUnavailable("Coach is busy right now. Please try again in a moment.");
         } catch (CallNotPermittedException e) {
@@ -112,13 +113,33 @@ public class LlmGateway implements ChatModel {
                     ? "Coach is busy right now (the free AI limit was reached). Please try again in a minute."
                     : "Coach is offline right now. Please try again later.");
         }
-        budget.record(totalTokens(response));
+        long tokens = totalTokens(response);
+        budget.recordTokens(tokens);
+        AiUsageTally.recordTokens(tokens);
         return response;
+    }
+
+    /** Like CircuitBreaker.decorateSupplier, except a 429 releases the permit instead of counting as a failure. */
+    private ChatResponse withCircuitBreaker(ChatModel delegate, Prompt prompt) {
+        circuitBreaker.acquirePermission();
+        long start = System.nanoTime();
+        try {
+            ChatResponse response = callWithOneRetry(delegate, prompt);
+            circuitBreaker.onSuccess(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+            return response;
+        } catch (RuntimeException e) {
+            if (ProviderFailure.of(e).rateLimited()) {
+                circuitBreaker.releasePermission();
+            } else {
+                circuitBreaker.onError(System.nanoTime() - start, TimeUnit.NANOSECONDS, e);
+            }
+            throw e;
+        }
     }
 
     private ChatResponse callWithOneRetry(ChatModel delegate, Prompt prompt) {
         try {
-            return delegate.call(prompt);
+            return send(delegate, prompt);
         } catch (RuntimeException first) {
             ProviderFailure failure = ProviderFailure.of(first);
             if (!failure.retryable()) {
@@ -136,8 +157,15 @@ public class LlmGateway implements ChatModel {
                 Thread.currentThread().interrupt();
                 throw first;
             }
-            return delegate.call(prompt);
+            return send(delegate, prompt);
         }
+    }
+
+    /** One request to the provider, counted whether or not it succeeds. */
+    private ChatResponse send(ChatModel delegate, Prompt prompt) {
+        budget.recordRequest();
+        AiUsageTally.recordRequest();
+        return delegate.call(prompt);
     }
 
     private static long totalTokens(ChatResponse response) {

@@ -11,6 +11,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
 import java.time.Duration;
+import java.time.ZoneId;
 
 /**
  * Settings for ClearWay's AI features ({@code clearway.ai.*} in application.yml).
@@ -67,7 +68,9 @@ public record AiProperties(
     public record Limits(
             @Min(1) int messagesPerHour,
             @Min(1) @Max(20_000) int maxInputChars,
+            @Min(1) long dailyRequestBudget,
             @Min(1) long dailyTokenBudget,
+            @NotNull ZoneId budgetResetZone,
             @NotNull Duration maxRetryWait) {
 
         public Limits {

@@ -43,7 +43,7 @@ dependencies {
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 	implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
 	implementation 'org.flywaydb:flyway-database-postgresql'
-	// AI: Groq through the OpenAI-compatible module, Gemini for embeddings (versions from the Spring AI BOM)
+	// AI: Gemini chat (default) or Groq through the OpenAI-compatible module, Gemini for embeddings (versions from the Spring AI BOM)
 	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'

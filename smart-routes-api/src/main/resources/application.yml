@@ -69,27 +69,32 @@ clearway:
   ai:
     enabled: ${CLEARWAY_AI_ENABLED:true}
     chat:
-      provider: ${CLEARWAY_AI_CHAT_PROVIDER:groq}   # groq | gemini
+      provider: ${CLEARWAY_AI_CHAT_PROVIDER:gemini}   # gemini (default, same key as embeddings) | groq
       temperature: 0.2
       max-output-tokens: 800
       timeout: 30s
     providers:
       # Both use their OpenAI-compatible endpoints. Model names change; check each provider's docs.
-      groq:
-        api-key: ${GROQ_API_KEY:}
-        base-url: https://api.groq.com/openai/v1
-        chat-model: ${GROQ_CHAT_MODEL:openai/gpt-oss-20b}
       gemini:
         api-key: ${GEMINI_API_KEY:}
         base-url: https://generativelanguage.googleapis.com/v1beta/openai/
         chat-model: ${GEMINI_CHAT_MODEL:gemini-3.8-flash}
+      groq:                         # optional
+        api-key: ${GROQ_API_KEY:}
+        base-url: https://api.groq.com/openai/v1
+        chat-model: ${GROQ_CHAT_MODEL:openai/gpt-oss-20b}
     embedding:
       model: gemini-embedding-001
       dimensions: 768
     limits:
       messages-per-hour: 20         # per user
       max-input-chars: 2000
-      daily-token-budget: 150000    # hosted tokens per day (UTC); Groq's free tier allows 200K for gpt-oss-20b
+      # Our own daily cap, kept below the provider's free quota. Gemini's free limits are per project
+      # and per model (RPM / TPM / RPD) and reset at midnight Pacific. Placeholders until the real
+      # numbers from the AI Studio console are filled in; one Coach message is several requests.
+      daily-request-budget: ${CLEARWAY_AI_DAILY_REQUESTS:200}
+      daily-token-budget: ${CLEARWAY_AI_DAILY_TOKENS:300000}
+      budget-reset-zone: ${CLEARWAY_AI_BUDGET_RESET_ZONE:America/Los_Angeles}
       max-retry-wait: 20s           # a longer Retry-After from the provider means answer 503 straight away
 
 security:

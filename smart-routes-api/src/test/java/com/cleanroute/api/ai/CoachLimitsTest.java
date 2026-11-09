@@ -54,45 +54,67 @@ class CoachLimitsTest {
     }
 
     @Test
-    void tokenBudget_BlocksWhenUsedUpAndResetsAtMidnightUtc() {
-        HostedTokenBudget budget = new HostedTokenBudget(100, clock);
-        budget.record(60);
+    void budget_BlocksWhenTokensAreUsedUp() {
+        HostedAiBudget budget = new HostedAiBudget(100, 100, clock);
+        budget.recordTokens(60);
         budget.ensureAvailable();
-        budget.record(40);
+        budget.recordTokens(40);
 
         assertThatThrownBy(budget::ensureAvailable)
                 .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getStatus().value()).isEqualTo(503));
+    }
 
-        clock.advance(Duration.ofHours(14)); // 2026-11-09T00:00Z
+    @Test
+    void budget_BlocksWhenRequestsAreUsedUpAndResetsAtMidnightPacific() {
+        // 10:00Z on 8 Nov is 02:00 in Los Angeles (PST, UTC-8), so that Pacific day ends at 08:00Z on 9 Nov.
+        HostedAiBudget budget = new HostedAiBudget(3, 1_000_000, clock.withZone(ZoneId.of("America/Los_Angeles")));
+        for (int i = 0; i < 3; i++) {
+            budget.ensureAvailable();
+            budget.recordRequest();
+        }
+        assertThatThrownBy(budget::ensureAvailable).isInstanceOf(ApiException.class);
+
+        clock.advance(Duration.ofHours(14)); // midnight UTC: still 8 Nov in Pacific, still blocked
+        assertThatThrownBy(budget::ensureAvailable).isInstanceOf(ApiException.class);
+
+        clock.advance(Duration.ofHours(8)); // 08:00Z = midnight Pacific
         budget.ensureAvailable();
-        assertThat(budget.usedToday()).isZero();
+        assertThat(budget.requestsToday()).isZero();
+        assertThat(budget.tokensToday()).isZero();
     }
 
     /** A clock the test can move forward. */
     static final class MutableClock extends Clock {
-        private Instant now;
+        private final Instant[] now;
+        private final ZoneId zone;
 
         MutableClock(Instant start) {
-            this.now = start;
+            this(new Instant[] {start}, ZoneOffset.UTC);
+        }
+
+        private MutableClock(Instant[] now, ZoneId zone) {
+            this.now = now;
+            this.zone = zone;
         }
 
         void advance(Duration by) {
-            now = now.plus(by);
+            now[0] = now[0].plus(by);
         }
 
         @Override
         public ZoneId getZone() {
-            return ZoneOffset.UTC;
+            return zone;
         }
 
+        /** Same moving time, seen in another zone. */
         @Override
-        public Clock withZone(ZoneId zone) {
-            return this;
+        public MutableClock withZone(ZoneId other) {
+            return new MutableClock(now, other);
         }
 
         @Override
         public Instant instant() {
-            return now;
+            return now[0];
         }
     }
 }

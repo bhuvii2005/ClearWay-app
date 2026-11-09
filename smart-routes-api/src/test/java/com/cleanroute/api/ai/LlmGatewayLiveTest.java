@@ -1,39 +1,38 @@
 package com.cleanroute.api.ai;
 
-import com.cleanroute.api.support.DotEnv;
-import io.github.resilience4j.bulkhead.Bulkhead;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.prompt.Prompt;
-
-import java.time.Clock;
-import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * One real round trip to Groq. Runs only with {@code ./gradlew evalTest} and only when
- * GROQ_API_KEY is set (environment or .env); otherwise it is skipped. Never part of build.
+ * Real round trips to the eval provider (Gemini unless CLEARWAY_EVAL_PROVIDER says otherwise).
+ * Runs only with {@code ./gradlew evalTest} and only when that provider's key is set
+ * (environment or .env); otherwise it is skipped. Never part of build.
  */
 @Tag("eval")
 class LlmGatewayLiveTest {
 
     @Test
-    void groqRoundTrip() {
-        var key = DotEnv.get("GROQ_API_KEY");
-        assumeTrue(key.isPresent(), "GROQ_API_KEY not set; skipping the live Groq check");
+    void liveRoundTrip_CountsRequestsAndTokensPerMessage() {
+        EvalSettings eval = EvalSettings.load();
+        assumeTrue(eval.apiKey.isPresent(), eval.keyName() + " not set; skipping the live " + eval.provider + " check");
 
-        AiProperties settings = AiTestSettings.groq(key.get(), "https://api.groq.com/openai/v1", Duration.ofSeconds(30));
-        HostedTokenBudget budget = new HostedTokenBudget(10_000, Clock.systemUTC());
-        LlmGateway gateway = new LlmGateway(new ChatModelFactory(settings).create(), budget,
-                CircuitBreaker.ofDefaults("llm"), Bulkhead.ofDefaults("llm"), Duration.ofSeconds(20),
-                d -> Thread.sleep(d.toMillis()));
+        HostedAiBudget budget = eval.budget();
+        LlmGateway gateway = eval.gateway(budget);
 
-        String answer = gateway.call(new Prompt("Reply with the single word: ready")).getResult().getOutput().getText();
+        // Two calls under one tally, like a Coach message with one tool round; the pacer spaces them.
+        try (AiUsageTally tally = AiUsageTally.open("live eval message")) {
+            String first = gateway.call(new Prompt("Reply with the single word: ready")).getResult().getOutput().getText();
+            String second = gateway.call(new Prompt("Reply with the single word: done")).getResult().getOutput().getText();
 
-        assertThat(answer).isNotBlank();
-        assertThat(budget.usedToday()).isPositive();
+            assertThat(first).isNotBlank();
+            assertThat(second).isNotBlank();
+            assertThat(tally.requests()).isGreaterThanOrEqualTo(2);
+            assertThat(tally.tokens()).isPositive();
+        }
+        assertThat(budget.requestsToday()).isGreaterThanOrEqualTo(2);
     }
 }

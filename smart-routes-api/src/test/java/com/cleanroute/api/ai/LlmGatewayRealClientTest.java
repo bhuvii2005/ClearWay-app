@@ -25,8 +25,8 @@ class LlmGatewayRealClientTest {
         try (ServerSocket socket = new ServerSocket(0)) {
             closedPort = socket.getLocalPort();
         }
-        AiProperties settings = AiTestSettings.groq("test-key-not-real", "http://127.0.0.1:" + closedPort + "/v1", Duration.ofSeconds(3));
-        LlmGateway gateway = new LlmGateway(new ChatModelFactory(settings).create(), new HostedTokenBudget(1000, Clock.systemUTC()),
+        AiProperties settings = AiTestSettings.forProvider(AiProperties.Provider.GEMINI, "test-key-not-real", "http://127.0.0.1:" + closedPort + "/v1", Duration.ofSeconds(3));
+        LlmGateway gateway = new LlmGateway(new ChatModelFactory(settings).create(), new HostedAiBudget(100, 1000, Clock.systemUTC()),
                 CircuitBreaker.ofDefaults("llm"), Bulkhead.ofDefaults("llm"), Duration.ofSeconds(20), d -> { });
 
         long start = System.nanoTime();

@@ -24,7 +24,7 @@ ClearWay finds walking, jogging, cycling and driving routes with cleaner air. It
 | Database | PostgreSQL 15 with PostGIS and pgvector (image built from `db/Dockerfile`), Flyway migrations |
 | Tooling | Docker Compose, GitHub Actions, JUnit 5 + Testcontainers, Vitest, Playwright smoke test |
 
-Every external service used is free and needs at most a free key (only TomTom).
+Every external service used is free and needs at most a free key (TomTom, plus Gemini for the optional AI Coach).
 
 ## Setup
 
@@ -43,8 +43,12 @@ Then replace each `change_me_...` placeholder in `.env`:
 | `POSTGRES_PASSWORD`, `SPRING_DATASOURCE_PASSWORD` | The same strong password in both |
 | `TOMTOM_API_KEY` | A free key from [developer.tomtom.com](https://developer.tomtom.com) (Dashboard > Keys) |
 | `JWT_SECRET` | A long random value, e.g. the output of `openssl rand -base64 48` |
+| `GEMINI_API_KEY` | Optional. A free key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey); one key covers Coach chat and knowledge-base search. Without it the Coach answers 503 and everything else works |
+| `GROQ_API_KEY` | Optional. Only if you switch the Coach to Groq with `CLEARWAY_AI_CHAT_PROVIDER=groq` ([console.groq.com/keys](https://console.groq.com/keys)) |
 
 Never commit `.env` or put real values in `.env.example`.
+
+**AI free-tier limits.** Gemini's free limits are per project and per model (requests per minute, tokens per minute, requests per day) and reset at midnight Pacific. The app keeps its own daily cap of requests and tokens below them, set with `CLEARWAY_AI_DAILY_REQUESTS` and `CLEARWAY_AI_DAILY_TOKENS`; once it's reached, the Coach answers 503 until midnight Pacific. One Coach message can take several requests, and the API logs the requests and tokens each message used. If the provider answers 429, the API retries once after the wait it asks for, then answers 503.
 
 ### 2a. Run everything with Docker (easiest)
 
@@ -81,12 +85,13 @@ The API reads the root `.env` automatically. On Windows, if Java 17 is not the d
 
 | Command | What it checks |
 |---|---|
-| `cd smart-routes-api && ./gradlew test` | 60 tests: services, security, the AI gateway and limits (fake models, no network), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
+| `cd smart-routes-api && ./gradlew test` | 64 tests: services, security, the AI gateway and limits (fake models, no network), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
+| `cd smart-routes-api && ./gradlew evalTest` | Live AI checks against Gemini (or Groq with `CLEARWAY_EVAL_PROVIDER=groq`). Skipped when the key isn't set. They use their own small budget (`CLEARWAY_EVAL_MAX_REQUESTS`, default 20; `CLEARWAY_EVAL_MAX_TOKENS`, default 20,000) and space calls to stay under `CLEARWAY_EVAL_RPM` (default 5 a minute). Never part of `build` |
 | `cd smart-routes-ui && npm test` | Air-quality bands, wording, and the API client |
 | `cd smart-routes-ui && npm run lint` | Code style and React rules |
 | `cd smart-routes-ui && npm run e2e` | Full browser journey against a running app (set `E2E_BASE_URL=http://localhost:4173` for the Docker version) |
 
-Tests never use your real database or API keys: outside services are mocked and the database is created fresh for each run.
+Tests never use your real database or API keys (only `evalTest` uses an AI key, on purpose): outside services are mocked and the database is created fresh for each run.
 
 ## Continuous integration
 

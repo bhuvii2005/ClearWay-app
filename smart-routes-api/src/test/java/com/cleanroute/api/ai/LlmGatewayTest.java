@@ -40,7 +40,7 @@ class LlmGatewayTest {
 
     private final List<Duration> waits = new ArrayList<>();
     private final AtomicInteger calls = new AtomicInteger();
-    private final HostedTokenBudget budget = new HostedTokenBudget(1_000, Clock.systemUTC());
+    private final HostedAiBudget budget = new HostedAiBudget(100, 1_000, Clock.systemUTC());
 
     @Test
     void notConfigured_Answers503() {
@@ -57,8 +57,41 @@ class LlmGatewayTest {
         LlmGateway gateway = gateway(prompt -> reply("hi", 30));
 
         assertThat(gateway.call(PROMPT).getResult().getOutput().getText()).isEqualTo("hi");
-        assertThat(budget.usedToday()).isEqualTo(30);
+        assertThat(budget.tokensToday()).isEqualTo(30);
+        assertThat(budget.requestsToday()).isEqualTo(1);
         assertThat(waits).isEmpty();
+    }
+
+    @Test
+    void usageTally_AddsUpRequestsAndTokensAcrossCallsOfOneMessage() {
+        LlmGateway gateway = gateway(prompt -> calls.incrementAndGet() == 2 ? throwStatus(429, "1") : reply("ok", 10));
+
+        try (AiUsageTally tally = AiUsageTally.open("test message")) {
+            gateway.call(PROMPT);           // 1 request, 10 tokens
+            gateway.call(PROMPT);           // 429 then retry: 2 requests, 10 tokens
+            assertThat(tally.requests()).isEqualTo(3);
+            assertThat(tally.tokens()).isEqualTo(20);
+        }
+        assertThat(budget.requestsToday()).isEqualTo(3);
+
+        // Outside a tally the gateway still works, and nothing is left on the thread.
+        gateway.call(PROMPT);
+        try (AiUsageTally next = AiUsageTally.open("next message")) {
+            assertThat(next.requests()).isZero();
+        }
+    }
+
+    @Test
+    void rateLimited_NeverTripsTheCircuitBreaker() {
+        LlmGateway gateway = gateway(prompt -> {
+            calls.incrementAndGet();
+            return throwStatus(429, "1");
+        });
+        for (int i = 0; i < 6; i++) {
+            assertThatThrownBy(() -> gateway.call(PROMPT)).isInstanceOf(ApiException.class).hasMessageContaining("free AI limit");
+        }
+        assertThat(gateway.circuitState()).isEqualTo(CircuitBreaker.State.CLOSED);
+        assertThat(calls).hasValue(12); // every message still reached the provider: once plus one retry
     }
 
     @Test
@@ -163,7 +196,7 @@ class LlmGatewayTest {
 
     @Test
     void budgetUsedUp_Answers503WithoutCallingProvider() {
-        budget.record(1_000);
+        budget.recordTokens(1_000);
         LlmGateway gateway = gateway(prompt -> {
             calls.incrementAndGet();
             return reply("never", 1);
@@ -171,6 +204,20 @@ class LlmGatewayTest {
 
         assertThatThrownBy(() -> gateway.call(PROMPT)).isInstanceOf(ApiException.class).hasMessageContaining("allowance");
         assertThat(calls).hasValue(0);
+    }
+
+    @Test
+    void requestBudgetUsedUp_Answers503WithoutCallingProvider() {
+        HostedAiBudget twoRequests = new HostedAiBudget(2, 1_000_000, Clock.systemUTC());
+        LlmGateway gateway = new LlmGateway(model(prompt -> {
+            calls.incrementAndGet();
+            return reply("ok", 1);
+        }), twoRequests, breaker(), bulkhead(4), Duration.ofSeconds(20), waits::add);
+
+        gateway.call(PROMPT);
+        gateway.call(PROMPT);
+        assertThatThrownBy(() -> gateway.call(PROMPT)).isInstanceOf(ApiException.class).hasMessageContaining("allowance");
+        assertThat(calls).hasValue(2);
     }
 
     @Test
@@ -186,7 +233,7 @@ class LlmGatewayTest {
     }
 
     private static Optional<ProviderChatModel> model(ChatModel fake) {
-        return Optional.of(new ProviderChatModel(AiProperties.Provider.GROQ, "test-model", fake));
+        return Optional.of(new ProviderChatModel(AiProperties.Provider.GEMINI, "test-model", fake));
     }
 
     private static CircuitBreaker breaker() {

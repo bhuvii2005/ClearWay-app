@@ -19,7 +19,7 @@ class AiSettingsTest {
             .withUserConfiguration(AiConfig.class, ChatModelFactory.class)
             .withPropertyValues(
                     "clearway.ai.enabled=true",
-                    "clearway.ai.chat.provider=groq",
+                    "clearway.ai.chat.provider=gemini",
                     "clearway.ai.chat.temperature=0.2",
                     "clearway.ai.chat.max-output-tokens=800",
                     "clearway.ai.chat.timeout=30s",
@@ -31,7 +31,9 @@ class AiSettingsTest {
                     "clearway.ai.embedding.dimensions=768",
                     "clearway.ai.limits.messages-per-hour=20",
                     "clearway.ai.limits.max-input-chars=2000",
-                    "clearway.ai.limits.daily-token-budget=150000",
+                    "clearway.ai.limits.daily-request-budget=200",
+                    "clearway.ai.limits.daily-token-budget=300000",
+                    "clearway.ai.limits.budget-reset-zone=America/Los_Angeles",
                     "clearway.ai.limits.max-retry-wait=20s");
 
     @Test
@@ -44,26 +46,29 @@ class AiSettingsTest {
 
     @Test
     void placeholderKeyFromEnvExample_CountsAsMissing() {
-        runner.withPropertyValues("clearway.ai.providers.groq.api-key=change_me_groq_key")
+        runner.withPropertyValues("clearway.ai.providers.gemini.api-key=change_me_gemini_key")
                 .run(ctx -> assertThat(ctx.getBean(ChatModelFactory.class).create()).isEmpty());
     }
 
     @Test
     void keySet_BuildsTheChosenProviderWithoutCallingIt() {
-        runner.withPropertyValues("clearway.ai.providers.groq.api-key=test-key-not-real")
+        runner.withPropertyValues("clearway.ai.providers.gemini.api-key=test-key-not-real")
                 .run(ctx -> assertThat(ctx.getBean(ChatModelFactory.class).create()).hasValueSatisfying(m -> {
-                    assertThat(m.provider()).isEqualTo(AiProperties.Provider.GROQ);
-                    assertThat(m.model()).isEqualTo("openai/gpt-oss-20b");
+                    assertThat(m.provider()).isEqualTo(AiProperties.Provider.GEMINI);
+                    assertThat(m.model()).isEqualTo("gemini-3.8-flash");
                 }));
 
-        runner.withPropertyValues("clearway.ai.chat.provider=gemini", "clearway.ai.providers.gemini.api-key=test-key-not-real")
+        // Groq is optional: chosen by config, and a Gemini key alone doesn't switch it on.
+        runner.withPropertyValues("clearway.ai.chat.provider=groq", "clearway.ai.providers.groq.api-key=test-key-not-real")
                 .run(ctx -> assertThat(ctx.getBean(ChatModelFactory.class).create())
-                        .hasValueSatisfying(m -> assertThat(m.provider()).isEqualTo(AiProperties.Provider.GEMINI)));
+                        .hasValueSatisfying(m -> assertThat(m.provider()).isEqualTo(AiProperties.Provider.GROQ)));
+        runner.withPropertyValues("clearway.ai.chat.provider=groq", "clearway.ai.providers.gemini.api-key=test-key-not-real")
+                .run(ctx -> assertThat(ctx.getBean(ChatModelFactory.class).create()).isEmpty());
     }
 
     @Test
     void disabled_TurnsCoachOffEvenWithAKey() {
-        runner.withPropertyValues("clearway.ai.enabled=false", "clearway.ai.providers.groq.api-key=test-key-not-real")
+        runner.withPropertyValues("clearway.ai.enabled=false", "clearway.ai.providers.gemini.api-key=test-key-not-real")
                 .run(ctx -> assertThat(ctx.getBean(ChatModelFactory.class).create()).isEmpty());
     }
 
@@ -74,6 +79,8 @@ class AiSettingsTest {
         runner.withPropertyValues("clearway.ai.chat.provider=openai").run(ctx -> assertThat(ctx).hasFailed());
         runner.withPropertyValues("clearway.ai.embedding.dimensions=0").run(ctx -> assertThat(ctx).hasFailed());
         runner.withPropertyValues("clearway.ai.limits.messages-per-hour=0").run(ctx -> assertThat(ctx).hasFailed());
+        runner.withPropertyValues("clearway.ai.limits.daily-request-budget=0").run(ctx -> assertThat(ctx).hasFailed());
+        runner.withPropertyValues("clearway.ai.limits.budget-reset-zone=Mars/Olympus").run(ctx -> assertThat(ctx).hasFailed());
     }
 
     @Test
@@ -84,7 +91,7 @@ class AiSettingsTest {
 
     @Test
     void health_IsUpEvenWhenCoachIsOff() {
-        LlmGateway off = new LlmGateway(Optional.empty(), new HostedTokenBudget(10, Clock.systemUTC()),
+        LlmGateway off = new LlmGateway(Optional.empty(), new HostedAiBudget(10, 10, Clock.systemUTC()),
                 CircuitBreaker.ofDefaults("llm"), Bulkhead.ofDefaults("llm"), Duration.ofSeconds(20), d -> { });
 
         var health = new AiHealthIndicator(off).health();
