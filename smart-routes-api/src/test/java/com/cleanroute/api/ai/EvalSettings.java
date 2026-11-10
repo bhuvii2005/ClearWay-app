@@ -51,7 +51,12 @@ final class EvalSettings {
         // The same model the app would use: GEMINI_CHAT_MODEL from .env, else the application.yml default.
         String geminiModel = DotEnv.get("GEMINI_CHAT_MODEL").map(String::trim).filter(s -> !s.isEmpty())
                 .orElse(AiTestSettings.GEMINI_CHAT_MODEL);
-        AiProperties settings = AiTestSettings.forProvider(provider, apiKey.orElseThrow(), baseUrl, Duration.ofSeconds(30), geminiModel);
+        // Same reasoning effort as the app: CLEARWAY_AI_REASONING_EFFORT, else "low".
+        // "default" sends none, so the model uses its own default (for before/after comparisons).
+        String effort = DotEnv.get("CLEARWAY_AI_REASONING_EFFORT").map(String::trim)
+                .map(v -> v.equalsIgnoreCase("default") ? "" : v).orElse("low");
+        AiProperties settings = AiTestSettings.forProvider(provider, apiKey.orElseThrow(), baseUrl, Duration.ofSeconds(30),
+                geminiModel, effort);
         ProviderChatModel real = new ChatModelFactory(settings).create().orElseThrow();
         ProviderChatModel paced = new ProviderChatModel(real.provider(), real.model(),
                 new PacedChatModel(real.chatModel(), requestsPerMinute));

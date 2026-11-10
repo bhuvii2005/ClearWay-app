@@ -61,6 +61,7 @@ final class ProviderGuard {
      * in the budget and passed to {@code onRequest}, for the caller's usage tally.
      */
     <T> T call(Supplier<T> request, Runnable onRequest) {
+        AiDeadline.ensureTimeLeft();
         budget.ensureAvailable();
         Supplier<T> counted = () -> {
             budget.recordRequest();
@@ -76,6 +77,11 @@ final class ProviderGuard {
         } catch (ApiException e) {
             throw e;
         } catch (RuntimeException e) {
+            if (AiDeadline.expired()) {
+                // Our time budget ran out (the call's timeout was cut to fit it); not a provider fault.
+                log.info("AI {} call stopped: the time budget ran out ({})", name, e.getClass().getSimpleName());
+                throw ApiException.serviceUnavailable(AiDeadline.OUT_OF_TIME);
+            }
             ProviderFailure failure = ProviderFailure.of(e);
             // Status only: provider messages can echo the request, and the request may hold user text.
             log.warn("AI {} call failed (status {}, {})", name,
@@ -95,7 +101,7 @@ final class ProviderGuard {
             circuitBreaker.onSuccess(System.nanoTime() - start, TimeUnit.NANOSECONDS);
             return result;
         } catch (RuntimeException e) {
-            if (ProviderFailure.of(e).rateLimited()) {
+            if (ProviderFailure.of(e).rateLimited() || AiDeadline.expired()) {
                 circuitBreaker.releasePermission();
             } else {
                 circuitBreaker.onError(System.nanoTime() - start, TimeUnit.NANOSECONDS, e);
@@ -116,6 +122,11 @@ final class ProviderGuard {
                     .orElse(failure.rateLimited() ? DEFAULT_RATE_LIMIT_WAIT : DEFAULT_SERVER_ERROR_WAIT);
             if (wait.compareTo(maxRetryWait) > 0) {
                 // The provider wants a long pause; answer now instead of holding the request open.
+                throw first;
+            }
+            boolean noTimeToRetry = AiDeadline.remaining()
+                    .map(left -> wait.plus(AiDeadline.MIN_CALL_TIME).compareTo(left) > 0).orElse(false);
+            if (noTimeToRetry) {
                 throw first;
             }
             try {

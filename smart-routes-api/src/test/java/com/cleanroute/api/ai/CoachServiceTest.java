@@ -203,7 +203,7 @@ class CoachServiceTest {
     void noProvider_Is503_AndProviderErrors_Are503() {
         CoachService off = new CoachService(new LlmGateway(Optional.empty(), budget, CircuitBreaker.ofDefaults("llm"),
                 Bulkhead.ofDefaults("llm"), Duration.ofSeconds(20), d -> { }), new CoachRateLimiter(20, clock), memory,
-                new Object[] {tools}, 2000, ObservationRegistry.NOOP, systemTemplate(), clock);
+                new Object[] {tools}, 2000, Duration.ofSeconds(45), ObservationRegistry.NOOP, systemTemplate(), clock);
         assertServiceUnavailable(() -> off.chat(ALICE, CONVERSATION, "hi", null));
 
         CoachService failing = coach(prompt -> {
@@ -257,7 +257,7 @@ class CoachServiceTest {
         model = new ScriptedChatModel(script);
         LlmGateway gateway = new LlmGateway(Optional.of(new ProviderChatModel(AiProperties.Provider.GEMINI, "scripted", model)),
                 budget, CircuitBreaker.ofDefaults("llm"), Bulkhead.ofDefaults("llm"), Duration.ofSeconds(20), d -> { });
-        return new CoachService(gateway, limiter, memory, new Object[] {tools}, 2000, ObservationRegistry.NOOP,
+        return new CoachService(gateway, limiter, memory, new Object[] {tools}, 2000, Duration.ofSeconds(45), ObservationRegistry.NOOP,
                 systemTemplate(), clock);
     }
 

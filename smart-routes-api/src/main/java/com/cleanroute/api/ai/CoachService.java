@@ -30,6 +30,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.DateTimeException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -63,6 +64,8 @@ public class CoachService {
     private final ChatClient chatClient;
     private final String systemTemplate;
     private final int maxInputChars;
+    /** Wall-clock budget for one message, all model calls and tools included ({@link AiDeadline}). */
+    private final Duration totalTimeout;
     private final Clock clock;
 
     @Autowired
@@ -70,13 +73,15 @@ public class CoachService {
                         AiProperties properties, ObjectProvider<ObservationRegistry> observations,
                         @Value("classpath:prompts/coach-system.st") Resource systemPrompt) {
         this(gateway, rateLimiter, memory, new Object[] {tools},
-                properties.limits().maxInputChars(), observations.getIfAvailable(() -> ObservationRegistry.NOOP),
-                read(systemPrompt), Clock.systemUTC());
+                properties.limits().maxInputChars(), properties.limits().coachTotalTimeout(),
+                observations.getIfAvailable(() -> ObservationRegistry.NOOP), read(systemPrompt), Clock.systemUTC());
     }
 
     CoachService(LlmGateway gateway, CoachRateLimiter rateLimiter, CoachMemory memory, Object[] tools,
-                 int maxInputChars, ObservationRegistry observations, String systemTemplate, Clock clock) {
+                 int maxInputChars, Duration totalTimeout, ObservationRegistry observations, String systemTemplate,
+                 Clock clock) {
         this.gateway = gateway;
+        this.totalTimeout = totalTimeout;
         this.rateLimiter = rateLimiter;
         this.memory = memory;
         this.tools = tools.clone();
@@ -123,7 +128,8 @@ public class CoachService {
         CoachTurn turn = new CoachTurn(userId, zone);
         String answer;
         List<CoachTurn.Citation> citations;
-        try (AiUsageTally ignored = AiUsageTally.open("coach message")) {
+        try (AiUsageTally ignored = AiUsageTally.open("coach message");
+             AiDeadline deadline = AiDeadline.start(totalTimeout)) {
             ChatResponse response = ask(messages, turn);
             if (hitToolLimit(response)) {
                 log.info("Coach stopped after {} tool calls", MAX_TOOL_CALLS);

@@ -141,8 +141,15 @@ class CoachApiIntegrationTest {
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message", containsString("conversationId")));
         mvc.perform(chat(token, "{\"conversationId\":\"not-a-uuid\",\"message\":\"hi\"}"))
                 .andExpect(status().isBadRequest());
-        mvc.perform(chat(token, "{\"conversationId\":\"" + id + "\",\"message\":\"hi\",\"timeZone\":\"Mars/Base\"}"))
-                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message", containsString("timeZone")));
+        // timeZone must be an IANA zone id (ZoneId.of); a bad one gets the standard error body.
+        for (String zone : java.util.List.of("Mars/Base", "Europe/Atlantis", "not a zone", "+99:00")) {
+            mvc.perform(chat(token, "{\"conversationId\":\"" + id + "\",\"message\":\"hi\",\"timeZone\":\"" + zone + "\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.status").value(400))
+                    .andExpect(jsonPath("$.error").value("Bad Request"))
+                    .andExpect(jsonPath("$.message", containsString("timeZone must be an IANA time zone")))
+                    .andExpect(jsonPath("$.timestamp").isNotEmpty());
+        }
     }
 
     @Test

@@ -72,7 +72,10 @@ clearway:
       provider: ${CLEARWAY_AI_CHAT_PROVIDER:gemini}   # gemini (default, same key as embeddings) | groq
       temperature: 0.2
       max-output-tokens: 800
-      timeout: 30s                  # whole hosted call; a hung model answers 503 after this (timeouts are not retried)
+      timeout: 30s                  # one hosted call; a hung model answers 503 after this (timeouts are not retried)
+      # reasoning_effort sent with every Coach call. low = faster and fewer tokens; blank = the model's default.
+      # Gemini 3 Flash: minimal | low | medium | high (thinking can't be fully off). Groq gpt-oss: low | medium | high.
+      reasoning-effort: ${CLEARWAY_AI_REASONING_EFFORT:low}
     providers:
       # Both use their OpenAI-compatible endpoints. Model names change; check each provider's docs.
       gemini:
@@ -106,6 +109,10 @@ clearway:
       daily-token-budget: ${CLEARWAY_AI_DAILY_TOKENS:300000}
       budget-reset-zone: ${CLEARWAY_AI_BUDGET_RESET_ZONE:America/Los_Angeles}
       max-retry-wait: 20s           # a longer Retry-After from the provider means answer 503 straight away
+      # Wall-clock budget for one Coach message, all model calls and tools included. Each model call's
+      # timeout is cut to the time left; when it runs out the Coach answers 503. Keep it below the UI's
+      # Coach timeout (smart-routes-ui/src/lib/api.js, COACH_TIMEOUT_MS).
+      coach-total-timeout: ${CLEARWAY_AI_COACH_TOTAL_TIMEOUT:45s}
 
 security:
   auth-rate-limit:

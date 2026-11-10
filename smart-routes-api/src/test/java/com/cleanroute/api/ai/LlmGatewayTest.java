@@ -130,6 +130,36 @@ class LlmGatewayTest {
     }
 
     @Test
+    void retryAfterLongerThanTheTimeLeft_DoesNotWait() {
+        LlmGateway gateway = gateway(prompt -> {
+            calls.incrementAndGet();
+            return throwStatus(429, "10"); // under the 20 s cap, but more than the 5 s left
+        });
+
+        try (AiDeadline ignored = AiDeadline.start(Duration.ofSeconds(5))) {
+            assertThatThrownBy(() -> gateway.call(PROMPT)).isInstanceOf(ApiException.class);
+        }
+        assertThat(calls).hasValue(1);
+        assertThat(waits).isEmpty();
+    }
+
+    @Test
+    void deadlinePassed_Answers503WithoutCallingProvider() {
+        LlmGateway gateway = gateway(prompt -> {
+            calls.incrementAndGet();
+            return reply("ok", 5);
+        });
+
+        try (AiDeadline ignored = AiDeadline.start(Duration.ofMillis(500))) { // under the 1 s minimum
+            assertThatThrownBy(() -> gateway.call(PROMPT))
+                    .isInstanceOfSatisfying(ApiException.class, e -> assertThat(e.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE))
+                    .hasMessage(AiDeadline.OUT_OF_TIME);
+        }
+        assertThat(calls).hasValue(0);
+        assertThat(budget.requestsToday()).isZero();
+    }
+
+    @Test
     void serverError_RetriesOnceWithBackoff() {
         LlmGateway gateway = gateway(prompt -> calls.incrementAndGet() == 1 ? throwStatus(502, null) : reply("ok", 5));
 

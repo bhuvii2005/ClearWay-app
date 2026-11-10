@@ -23,6 +23,7 @@ class AiSettingsTest {
                     "clearway.ai.chat.temperature=0.2",
                     "clearway.ai.chat.max-output-tokens=800",
                     "clearway.ai.chat.timeout=30s",
+                    "clearway.ai.chat.reasoning-effort=low",
                     "clearway.ai.providers.groq.base-url=https://api.groq.com/openai/v1",
                     "clearway.ai.providers.groq.chat-model=openai/gpt-oss-20b",
                     "clearway.ai.providers.gemini.base-url=https://generativelanguage.googleapis.com/v1beta/openai/",
@@ -42,7 +43,8 @@ class AiSettingsTest {
                     "clearway.ai.limits.daily-request-budget=200",
                     "clearway.ai.limits.daily-token-budget=300000",
                     "clearway.ai.limits.budget-reset-zone=America/Los_Angeles",
-                    "clearway.ai.limits.max-retry-wait=20s");
+                    "clearway.ai.limits.max-retry-wait=20s",
+                    "clearway.ai.limits.coach-total-timeout=45s");
 
     @Test
     void noKey_StartsFineWithCoachOff() {

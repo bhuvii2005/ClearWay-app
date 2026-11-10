@@ -45,15 +45,21 @@ class CoachLiveTest {
                 .thenAnswer(inv -> history(route, inv.getArgument(2), inv.getArgument(3)));
         CoachTools tools = new CoachTools(routes, mock(UserRepository.class), mock(OpenMeteoAqiClient.class),
                 mock(KnowledgeBaseSearch.class));
+        // The app's total budget per message (CLEARWAY_AI_COACH_TOTAL_TIMEOUT, default 45 s).
+        java.time.Duration total = com.cleanroute.api.support.DotEnv.get("CLEARWAY_AI_COACH_TOTAL_TIMEOUT")
+                .map(v -> org.springframework.boot.convert.DurationStyle.detectAndParse(v.trim()))
+                .orElse(java.time.Duration.ofSeconds(45));
         CoachService coach = new CoachService(eval.gateway(eval.budget()), new CoachRateLimiter(100, Clock.systemUTC()),
-                new CoachMemory(), new Object[] {tools}, 2000, ObservationRegistry.NOOP, CoachServiceTest.systemTemplate(),
+                new CoachMemory(), new Object[] {tools}, 2000, total, ObservationRegistry.NOOP, CoachServiceTest.systemTemplate(),
                 Clock.systemUTC());
 
         CoachService.CoachReply reply;
         try (AiUsageTally tally = AiUsageTally.open("live Coach eval")) {
+            long start = System.nanoTime();
             reply = coach.chat(user, UUID.randomUUID(), "When is the best time to walk my saved route?", "Asia/Kolkata");
-            System.out.printf("  answer: %s%n  tools: %s%n  chat requests: %d, tokens: %d%n",
-                    reply.answer(), reply.toolsUsed(), tally.chatRequests(), tally.chatTokens());
+            System.out.printf("  answer: %s%n  tools: %s%n  chat requests: %d, tokens: %d, total %d ms%n",
+                    reply.answer(), reply.toolsUsed(), tally.chatRequests(), tally.chatTokens(),
+                    (System.nanoTime() - start) / 1_000_000);
         }
 
         assertThat(reply.toolsUsed()).containsSubsequence("listMyRoutes", "getRouteHistory");

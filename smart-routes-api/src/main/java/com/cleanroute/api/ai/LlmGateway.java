@@ -5,11 +5,14 @@ import io.github.resilience4j.bulkhead.Bulkhead;
 import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
@@ -26,6 +29,8 @@ import java.util.Optional;
  */
 @Component
 public class LlmGateway implements ChatModel {
+
+    private static final Logger log = LoggerFactory.getLogger(LlmGateway.class);
 
     private final Optional<ProviderChatModel> model;
     private final ProviderGuard guard;
@@ -70,11 +75,31 @@ public class LlmGateway implements ChatModel {
     public ChatResponse call(Prompt prompt) {
         ProviderChatModel target = model.orElseThrow(() ->
                 ApiException.serviceUnavailable("Coach is offline right now: no AI provider is set up."));
-        ChatResponse response = guard.call(() -> target.chatModel().call(prompt), AiUsageTally::recordChatRequest);
+        long start = System.nanoTime();
+        ChatResponse response = guard.call(() -> target.chatModel().call(withinDeadline(prompt, target)),
+                AiUsageTally::recordChatRequest);
         long tokens = totalTokens(response);
         guard.budget().recordTokens(tokens);
         AiUsageTally.recordChatTokens(tokens);
+        log.info("AI chat call: {} ms, {} tokens", (System.nanoTime() - start) / 1_000_000, tokens);
         return response;
+    }
+
+    /**
+     * When a time budget is open ({@link AiDeadline}), cuts this call's timeout to the time left,
+     * so a slow model can't hold one Coach message open for several full timeouts.
+     */
+    private static Prompt withinDeadline(Prompt prompt, ProviderChatModel target) {
+        Optional<Duration> left = AiDeadline.remaining();
+        if (left.isEmpty() || !(prompt.getOptions() instanceof OpenAiChatOptions options)) {
+            return prompt;
+        }
+        Duration configured = options.getTimeout() != null ? options.getTimeout()
+                : target.chatModel().getOptions() instanceof OpenAiChatOptions defaults ? defaults.getTimeout() : null;
+        if (configured != null && configured.compareTo(left.get()) <= 0) {
+            return prompt;
+        }
+        return prompt.mutate().chatOptions(options.mutate().timeout(left.get()).build()).build();
     }
 
     private static long totalTokens(ChatResponse response) {

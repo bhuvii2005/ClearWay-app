@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
@@ -34,10 +35,15 @@ public record AiProperties(
             @NotNull Provider provider,
             @DecimalMin("0.0") @DecimalMax("2.0") double temperature,
             @Min(1) @Max(8192) int maxOutputTokens,
-            @NotNull Duration timeout) {
+            @NotNull Duration timeout,
+            // Sent as reasoning_effort. Blank means the model's default. Gemini 3 Flash takes
+            // minimal/low/medium/high (thinking can't be fully off); Groq's gpt-oss takes low/medium/high.
+            @Pattern(regexp = "|none|minimal|low|medium|high",
+                    message = "must be blank or one of none, minimal, low, medium, high") String reasoningEffort) {
 
         public Chat {
             requirePositive(timeout, "clearway.ai.chat.timeout");
+            reasoningEffort = reasoningEffort == null ? "" : reasoningEffort.strip();
         }
     }
 
@@ -91,10 +97,13 @@ public record AiProperties(
             @Min(1) long dailyRequestBudget,
             @Min(1) long dailyTokenBudget,
             @NotNull ZoneId budgetResetZone,
-            @NotNull Duration maxRetryWait) {
+            @NotNull Duration maxRetryWait,
+            // Wall-clock budget for one Coach message, all tool rounds included.
+            @NotNull Duration coachTotalTimeout) {
 
         public Limits {
             requirePositive(maxRetryWait, "clearway.ai.limits.max-retry-wait");
+            requirePositive(coachTotalTimeout, "clearway.ai.limits.coach-total-timeout");
         }
     }
 

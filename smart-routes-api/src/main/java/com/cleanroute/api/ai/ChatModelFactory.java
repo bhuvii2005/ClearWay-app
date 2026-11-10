@@ -37,7 +37,13 @@ public class ChatModelFactory {
                     + "the rest of the app works normally.", provider, provider);
             return Optional.empty();
         }
-        OpenAiChatOptions options = OpenAiChatOptions.builder()
+        String reasoningEffort = properties.chat().reasoningEffort();
+        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder();
+        if (!reasoningEffort.isEmpty()) {
+            // Less thinking means faster replies and fewer tokens; the Coach's work is simple lookups.
+            builder.reasoningEffort(reasoningEffort);
+        }
+        OpenAiChatOptions options = builder
                 .baseUrl(settings.baseUrl())
                 .apiKey(settings.apiKey())
                 .model(settings.chatModel())
@@ -47,7 +53,8 @@ public class ChatModelFactory {
                 .maxRetries(0)
                 .maxTokens(properties.chat().maxOutputTokens())
                 .build();
-        log.info("Coach chat provider: {} ({})", provider, settings.chatModel());
+        log.info("Coach chat provider: {} ({}, reasoning effort {})", provider, settings.chatModel(),
+                reasoningEffort.isEmpty() ? "model default" : reasoningEffort);
         return Optional.of(new ProviderChatModel(provider, settings.chatModel(),
                 OpenAiChatModel.builder().options(options).build()));
     }

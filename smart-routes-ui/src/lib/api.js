@@ -97,6 +97,19 @@ export const routesApi = {
   history: (id, days, tz) => data(api.get(`/api/v1/routes/${id}/metrics`, { params: { days, tz } })),
 };
 
+/**
+ * One Coach message is several AI calls. The server stops it after its total budget
+ * (CLEARWAY_AI_COACH_TOTAL_TIMEOUT, 45 s by default) plus at most one tool that was already
+ * running (a knowledge-base lookup: up to 20 s, usually about 1 s). This must stay above that,
+ * so the browser never gives up before the server answers.
+ */
+export const COACH_TIMEOUT_MS = 75000;
+
+export const coachApi = {
+  chat: (conversationId, message, timeZone) =>
+    data(api.post('/api/v1/coach/chat', { conversationId, message, timeZone }, { timeout: COACH_TIMEOUT_MS })),
+};
+
 export const alertsApi = {
   list: (limit = 50) => data(api.get('/api/v1/notifications', { params: { limit } })),
   unreadCount: () => data(api.get('/api/v1/notifications/unread-count')).then((d) => d.unread ?? 0),

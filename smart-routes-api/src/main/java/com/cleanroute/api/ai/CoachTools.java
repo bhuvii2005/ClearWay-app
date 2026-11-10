@@ -161,6 +161,10 @@ public class CoachTools {
     private Object run(ToolContext context, String name, Body body) {
         CoachTurn turn = turn(context);
         turn.toolUsed(name);
+        if (AiDeadline.expired()) {
+            // The message's time budget is spent; the next model call will end it with a 503.
+            return new ToolError("Out of time for this question.");
+        }
         try {
             return body.apply(turn);
         } catch (ApiException e) {
