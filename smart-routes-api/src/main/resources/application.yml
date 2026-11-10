@@ -72,13 +72,14 @@ clearway:
       provider: ${CLEARWAY_AI_CHAT_PROVIDER:gemini}   # gemini (default, same key as embeddings) | groq
       temperature: 0.2
       max-output-tokens: 800
-      timeout: 30s
+      timeout: 30s                  # whole hosted call; a hung model answers 503 after this (timeouts are not retried)
     providers:
       # Both use their OpenAI-compatible endpoints. Model names change; check each provider's docs.
       gemini:
         api-key: ${GEMINI_API_KEY:}
         base-url: https://generativelanguage.googleapis.com/v1beta/openai/
-        chat-model: ${GEMINI_CHAT_MODEL:gemini-3.8-flash}
+        # gemini-3.8-flash is also available, but it hung (no reply) on the free tier in Nov 2026.
+        chat-model: ${GEMINI_CHAT_MODEL:gemini-3.5-flash}
       groq:                         # optional
         api-key: ${GROQ_API_KEY:}
         base-url: https://api.groq.com/openai/v1

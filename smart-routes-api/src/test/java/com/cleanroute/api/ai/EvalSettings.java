@@ -48,7 +48,10 @@ final class EvalSettings {
     /** A gateway on the real provider, with the eval budget and RPM spacing. */
     LlmGateway gateway(HostedAiBudget budget) {
         String baseUrl = provider == AiProperties.Provider.GEMINI ? AiTestSettings.GEMINI_URL : AiTestSettings.GROQ_URL;
-        AiProperties settings = AiTestSettings.forProvider(provider, apiKey.orElseThrow(), baseUrl, Duration.ofSeconds(30));
+        // The same model the app would use: GEMINI_CHAT_MODEL from .env, else the application.yml default.
+        String geminiModel = DotEnv.get("GEMINI_CHAT_MODEL").map(String::trim).filter(s -> !s.isEmpty())
+                .orElse(AiTestSettings.GEMINI_CHAT_MODEL);
+        AiProperties settings = AiTestSettings.forProvider(provider, apiKey.orElseThrow(), baseUrl, Duration.ofSeconds(30), geminiModel);
         ProviderChatModel real = new ChatModelFactory(settings).create().orElseThrow();
         ProviderChatModel paced = new ProviderChatModel(real.provider(), real.model(),
                 new PacedChatModel(real.chatModel(), requestsPerMinute));

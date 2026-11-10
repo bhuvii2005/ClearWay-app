@@ -162,6 +162,27 @@ class KnowledgeBaseIntegrationTest {
                 "SELECT count(*) FROM vector_store WHERE metadata->>'embedding_model' <> 'gemini-embedding-001'", Integer.class)).isZero();
     }
 
+    @Test
+    void search_LogsTheTopScoreEvenBelowTheThreshold_ButNeverTheQuery() {
+        FakeEmbeddingModel fake = new FakeEmbeddingModel();
+        ingestor(fake, "classpath:kb/*.md", 20).ingest();
+        ch.qos.logback.classic.Logger logger =
+                (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(KnowledgeBaseSearch.class);
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs = new ch.qos.logback.core.read.ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            assertThat(search(fake, 0.99).search("safe PM2.5 level for my lungs")).isEmpty();
+        } finally {
+            logger.detachAppender(logs);
+        }
+
+        assertThat(logs.list).singleElement().satisfies(e -> {
+            assertThat(e.getFormattedMessage()).matches("Knowledge base search: top score 0\\.\\d{3}, 0 of 4 results .*0\\.99 threshold");
+            assertThat(e.getFormattedMessage()).doesNotContain("PM2.5").doesNotContain("lungs");
+        });
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private KnowledgeBaseIngestor ingestor(FakeEmbeddingModel model, String location, int batchSize) {

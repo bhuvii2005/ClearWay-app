@@ -10,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -52,10 +53,17 @@ public class KnowledgeBaseSearch {
         SearchRequest request = SearchRequest.builder()
                 .query(query.strip())
                 .topK(topK)
-                .similarityThreshold(threshold)
+                // No cutoff in the query, so the top score is known (and logged) even when nothing passes.
+                .similarityThresholdAll()
                 .filterExpression(new FilterExpressionBuilder().eq(KnowledgeBaseMetadata.EMBEDDING_MODEL, model).build())
                 .build();
-        return store.get().similaritySearch(request).stream().map(KnowledgeBaseSearch::toChunk).toList();
+        List<KnowledgeChunk> all = store.get().similaritySearch(request).stream().map(KnowledgeBaseSearch::toChunk).toList();
+        List<KnowledgeChunk> hits = all.stream().filter(c -> c.score() >= threshold).toList();
+        // Scores only, never the query text: it is the user's own words.
+        log.info("Knowledge base search: top score {}, {} of {} results at or above the {} threshold",
+                all.isEmpty() ? "none" : String.format(Locale.ROOT, "%.3f", all.get(0).score()),
+                hits.size(), all.size(), threshold);
+        return hits;
     }
 
     private static KnowledgeChunk toChunk(Document doc) {
