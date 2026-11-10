@@ -83,6 +83,10 @@ final class ProviderGuard {
                 throw ApiException.serviceUnavailable(AiDeadline.OUT_OF_TIME);
             }
             ProviderFailure failure = ProviderFailure.of(e);
+            if (failure.dailyQuota()) {
+                budget.markExhaustedForToday();
+                throw ApiException.serviceUnavailable(HostedAiBudget.USED_UP);
+            }
             // Status only: provider messages can echo the request, and the request may hold user text.
             log.warn("AI {} call failed (status {}, {})", name,
                     failure.status() == 0 ? "network/timeout" : failure.status(), e.getClass().getSimpleName());

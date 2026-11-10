@@ -27,8 +27,8 @@ final class EvalSettings {
         provider = AiProperties.Provider.valueOf(
                 DotEnv.get("CLEARWAY_EVAL_PROVIDER").orElse("gemini").trim().toUpperCase(Locale.ROOT));
         apiKey = DotEnv.get(keyName());
-        maxRequests = intSetting("CLEARWAY_EVAL_MAX_REQUESTS", 20);
-        maxTokens = intSetting("CLEARWAY_EVAL_MAX_TOKENS", 20_000);
+        maxRequests = intSetting("CLEARWAY_EVAL_MAX_REQUESTS", 70);
+        maxTokens = intSetting("CLEARWAY_EVAL_MAX_TOKENS", 150_000);
         requestsPerMinute = intSetting("CLEARWAY_EVAL_RPM", 5);
     }
 

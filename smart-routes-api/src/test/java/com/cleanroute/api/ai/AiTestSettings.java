@@ -9,7 +9,7 @@ final class AiTestSettings {
     static final String GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
     static final String GROQ_URL = "https://api.groq.com/openai/v1";
     /** Same default as application.yml. */
-    static final String GEMINI_CHAT_MODEL = "gemini-3.5-flash";
+    static final String GEMINI_CHAT_MODEL = "gemini-3.5-flash-lite";
 
     private AiTestSettings() {
     }

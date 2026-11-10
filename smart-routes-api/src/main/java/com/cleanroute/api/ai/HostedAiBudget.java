@@ -18,6 +18,8 @@ public class HostedAiBudget {
 
     private static final Logger log = LoggerFactory.getLogger(HostedAiBudget.class);
 
+    static final String USED_UP = "The Coach has used today's free AI allowance. Please try again tomorrow.";
+
     private final String name;
     private final long maxRequests;
     private final long maxTokens;
@@ -26,6 +28,8 @@ public class HostedAiBudget {
     private long requests;
     private long tokens;
     private boolean warned;
+    /** The provider said today's quota is gone (a per-day 429); stays set until the day rolls over. */
+    private boolean providerExhausted;
 
     /** The clock's zone decides when the day rolls over. */
     public HostedAiBudget(String name, long maxRequests, long maxTokens, Clock clock) {
@@ -43,15 +47,33 @@ public class HostedAiBudget {
     /** Throws 503 once today's request or token budget is used up. */
     public synchronized void ensureAvailable() {
         rollOver();
-        if (requests >= maxRequests || tokens >= maxTokens) {
+        if (requests >= maxRequests || tokens >= maxTokens || providerExhausted) {
             if (!warned) {
                 log.warn("Daily hosted AI {} budget used up ({}/{} requests, {} tokens); AI {} is off until midnight {}.",
                         name, requests, maxRequests, tokens, name, clock.getZone());
                 warned = true;
             }
-            throw ApiException.serviceUnavailable(
-                    "The Coach has used today's free AI allowance. Please try again tomorrow.");
+            throw ApiException.serviceUnavailable(USED_UP);
         }
+    }
+
+    /**
+     * The provider answered 429 for its per-day quota: no more calls until midnight in the clock's
+     * zone (Pacific by default, when Gemini's free quota resets), even if our own cap isn't reached.
+     */
+    public synchronized void markExhaustedForToday() {
+        rollOver();
+        if (!providerExhausted) {
+            log.warn("The {} provider's daily free quota is used up ({} requests sent today); AI {} is off until midnight {}.",
+                    name, requests, name, clock.getZone());
+            providerExhausted = true;
+            warned = true;
+        }
+    }
+
+    public synchronized boolean exhaustedToday() {
+        rollOver();
+        return requests >= maxRequests || tokens >= maxTokens || providerExhausted;
     }
 
     /** Counts one request sent to the provider (a retry is a second request). */
@@ -84,6 +106,7 @@ public class HostedAiBudget {
             requests = 0;
             tokens = 0;
             warned = false;
+            providerExhausted = false;
         }
     }
 

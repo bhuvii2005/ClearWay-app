@@ -17,8 +17,19 @@ import java.util.regex.Pattern;
  *
  * @param status     HTTP status from the provider, or 0 for network errors and timeouts
  * @param retryAfter how long the provider asked us to wait, when it said so
+ * @param dailyQuota a 429 for a per-day quota (not per-minute): no point calling again before it resets
  */
-public record ProviderFailure(int status, Optional<Duration> retryAfter) {
+public record ProviderFailure(int status, Optional<Duration> retryAfter, boolean dailyQuota) {
+
+    /**
+     * Per-day quota wording. Gemini: quotaId "GenerateRequestsPerDayPerProjectPerModel-FreeTier" and
+     * "requests per day limit exceeded". Groq: "requests per day (RPD)" / "tokens per day (TPD)".
+     */
+    private static final Pattern DAILY_QUOTA = Pattern.compile("(?i)quotaId\\W+\\w*PerDay|per day|\\b[RT]PD\\b");
+
+    public ProviderFailure(int status, Optional<Duration> retryAfter) {
+        this(status, retryAfter, false);
+    }
 
     /** Gemini's SDK has no Retry-After header; its 429 says "Please retry in 17.5s." or "retryDelay": "17s". */
     private static final Pattern GEMINI_RETRY_DELAY =
@@ -28,23 +39,29 @@ public record ProviderFailure(int status, Optional<Duration> retryAfter) {
         return status == 429;
     }
 
-    /** Only "slow down" (429) and provider-side errors (5xx) are worth one more try. */
+    /** Only "slow down" (429) and provider-side errors (5xx) are worth one more try; a used-up day isn't. */
     public boolean retryable() {
-        return status == 429 || status >= 500;
+        return !dailyQuota && (status == 429 || status >= 500);
     }
 
     /** Reads the status and Retry-After from the exception or anything in its cause chain. */
     public static ProviderFailure of(Throwable error) {
         for (Throwable t = error; t != null; t = t.getCause() == t ? null : t.getCause()) {
             if (t instanceof OpenAIServiceException e) {
-                return new ProviderFailure(e.statusCode(), retryAfter(e.headers().values("retry-after")));
+                String body = String.valueOf(e.body()) + " " + e.getMessage();
+                // Gemini's OpenAI-compatible endpoint sends no Retry-After header, only "retryDelay" in the body.
+                Optional<Duration> wait = retryAfter(e.headers().values("retry-after"));
+                return new ProviderFailure(e.statusCode(), wait.isPresent() ? wait : geminiRetryDelay(body),
+                        e.statusCode() == 429 && mentionsDailyQuota(body));
             }
             if (t instanceof RestClientResponseException e) {
                 var values = e.getResponseHeaders() == null ? List.<String>of() : e.getResponseHeaders().getOrEmpty("Retry-After");
-                return new ProviderFailure(e.getStatusCode().value(), retryAfter(values));
+                return new ProviderFailure(e.getStatusCode().value(), retryAfter(values),
+                        e.getStatusCode().value() == 429 && mentionsDailyQuota(e.getResponseBodyAsString()));
             }
             if (t instanceof ApiException e) {
-                return new ProviderFailure(e.code(), geminiRetryDelay(e.getMessage()));
+                return new ProviderFailure(e.code(), geminiRetryDelay(e.getMessage()),
+                        e.code() == 429 && mentionsDailyQuota(e.getMessage()));
             }
             if (t instanceof OpenAIIoException || t instanceof GenAiIOException) {
                 return new ProviderFailure(0, Optional.empty());
@@ -64,6 +81,10 @@ public record ProviderFailure(int status, Optional<Duration> retryAfter) {
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
+    }
+
+    static boolean mentionsDailyQuota(String text) {
+        return text != null && DAILY_QUOTA.matcher(text).find();
     }
 
     static Optional<Duration> geminiRetryDelay(String message) {

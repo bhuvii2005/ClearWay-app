@@ -27,7 +27,7 @@ class AiSettingsTest {
                     "clearway.ai.providers.groq.base-url=https://api.groq.com/openai/v1",
                     "clearway.ai.providers.groq.chat-model=openai/gpt-oss-20b",
                     "clearway.ai.providers.gemini.base-url=https://generativelanguage.googleapis.com/v1beta/openai/",
-                    "clearway.ai.providers.gemini.chat-model=gemini-3.5-flash",
+                    "clearway.ai.providers.gemini.chat-model=gemini-3.5-flash-lite",
                     "clearway.ai.embedding.model=gemini-embedding-001",
                     "clearway.ai.embedding.dimensions=768",
                     "clearway.ai.embedding.timeout=20s",
@@ -65,7 +65,7 @@ class AiSettingsTest {
         runner.withPropertyValues("clearway.ai.providers.gemini.api-key=test-key-not-real")
                 .run(ctx -> assertThat(ctx.getBean(ChatModelFactory.class).create()).hasValueSatisfying(m -> {
                     assertThat(m.provider()).isEqualTo(AiProperties.Provider.GEMINI);
-                    assertThat(m.model()).isEqualTo("gemini-3.5-flash");
+                    assertThat(m.model()).isEqualTo("gemini-3.5-flash-lite");
                 }));
 
         // Groq is optional: chosen by config, and a Gemini key alone doesn't switch it on.

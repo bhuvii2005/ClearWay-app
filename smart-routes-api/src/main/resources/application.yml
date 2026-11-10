@@ -66,6 +66,10 @@ alerts:
 # ClearWay Coach (AI). Free hosted tiers only; keys come from .env and are never written here.
 # With no key for the chosen provider the Coach answers 503 and the rest of the app runs normally.
 clearway:
+  metrics:
+    # Login for /actuator/info and /actuator/metrics. No defaults: unset means those endpoints are off.
+    user: ${CLEARWAY_METRICS_USER:}
+    password: ${CLEARWAY_METRICS_PASSWORD:}
   ai:
     enabled: ${CLEARWAY_AI_ENABLED:true}
     chat:
@@ -81,8 +85,9 @@ clearway:
       gemini:
         api-key: ${GEMINI_API_KEY:}
         base-url: https://generativelanguage.googleapis.com/v1beta/openai/
-        # gemini-3.8-flash is also available, but it hung (no reply) on the free tier in Nov 2026.
-        chat-model: ${GEMINI_CHAT_MODEL:gemini-3.5-flash}
+        # flash-lite: fastest in our Nov 2026 comparison (docs/coach-model-comparison.md), with its own
+        # free quota. gemini-3.5-flash allows only 20 requests a day free; gemini-3.8-flash hung (no reply).
+        chat-model: ${GEMINI_CHAT_MODEL:gemini-3.5-flash-lite}
       groq:                         # optional
         api-key: ${GROQ_API_KEY:}
         base-url: https://api.groq.com/openai/v1
@@ -105,7 +110,9 @@ clearway:
       # Our own daily cap, kept below the provider's free quota. Gemini's free limits are per project
       # and per model (RPM / TPM / RPD) and reset at midnight Pacific. Placeholders until the real
       # numbers from the AI Studio console are filled in; one Coach message is several requests.
-      daily-request-budget: ${CLEARWAY_AI_DAILY_REQUESTS:200}
+      # 20 for gemini-3.5-flash-lite until the AI Studio numbers are in. A per-day 429 from the
+      # provider also stops all calls until the reset, whatever this says.
+      daily-request-budget: ${CLEARWAY_AI_DAILY_REQUESTS:20}
       daily-token-budget: ${CLEARWAY_AI_DAILY_TOKENS:300000}
       budget-reset-zone: ${CLEARWAY_AI_BUDGET_RESET_ZONE:America/Los_Angeles}
       max-retry-wait: 20s           # a longer Retry-After from the provider means answer 503 straight away
@@ -162,7 +169,9 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # Only health is public. info and metrics need CLEARWAY_METRICS_USER / CLEARWAY_METRICS_PASSWORD
+        # (HTTP Basic, see ActuatorSecurityConfig); without them they are switched off.
+        include: health,info,metrics
   endpoint:
     health:
       show-details: never
