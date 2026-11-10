@@ -52,6 +52,8 @@ Never commit `.env` or put real values in `.env.example`.
 
 **AI free-tier limits.** Gemini's free limits are per project and per model (requests per minute, tokens per minute, requests per day) and reset at midnight Pacific. The app keeps its own daily cap of requests and tokens below them, set with `CLEARWAY_AI_DAILY_REQUESTS` and `CLEARWAY_AI_DAILY_TOKENS`; once it's reached, the Coach answers 503 until midnight Pacific. One Coach message can take several requests, and the API logs the chat requests, tokens and embedding requests each message used. Embeddings have their own Gemini quota and their own daily cap (`CLEARWAY_AI_EMBED_DAILY_REQUESTS`). If the provider answers 429, the API retries once after the wait it asks for, then answers 503.
 
+**ClearWay Coach.** `POST /api/v1/coach/chat` answers questions about your saved routes and the air. It can call five read-only tools: list your routes, a route's history (with its cleanest and most polluted hours), current air quality at a point, your pollutant sensitivities, and a knowledge-base search. Tools get your identity from your login, never from the model, so the Coach can't see anyone else's routes. Every number in an answer has to come from a tool, and sources are listed only when the knowledge-base search actually returned them. A message can use at most 5 tool calls. The Coach remembers the last 10 messages of each conversation in memory only, so history is lost when the API restarts, and it's cleared when you delete your account.
+
 **Coach knowledge base.** Five short guidance files in [`smart-routes-api/src/main/resources/kb/`](smart-routes-api/src/main/resources/kb/) (WHO guideline levels, European AQI bands, health effects, exercising in poor air, how ClearWay scores routes) are embedded with Gemini and stored in the `vector_store` table (migration V6, pgvector). This happens in the background at start-up, and only for files that are new or changed, so a normal restart uses no embedding requests. Each file is stored all-or-nothing: if Gemini answers 429 partway through, that file is left as it was and is retried on the next start-up. Without `GEMINI_API_KEY` the knowledge base is simply off.
 
 ### 2a. Run everything with Docker (easiest)
@@ -89,8 +91,8 @@ The API reads the root `.env` automatically. On Windows, if Java 17 is not the d
 
 | Command | What it checks |
 |---|---|
-| `cd smart-routes-api && ./gradlew test` | 77 tests: services, security, the AI gateway, limits and knowledge base (fake models, no network), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
-| `cd smart-routes-api && ./gradlew evalTest` | Live AI checks against Gemini, including a knowledge-base search for "safe PM2.5 level" (or Groq with `CLEARWAY_EVAL_PROVIDER=groq`). Skipped when the key isn't set. They use their own small budget (`CLEARWAY_EVAL_MAX_REQUESTS`, default 20; `CLEARWAY_EVAL_MAX_TOKENS`, default 20,000) and space calls to stay under `CLEARWAY_EVAL_RPM` (default 5 a minute). Never part of `build` |
+| `cd smart-routes-api && ./gradlew test` | 101 tests: services, security, the AI gateway, limits, knowledge base and Coach (scripted models and a fake provider on localhost, no internet), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
+| `cd smart-routes-api && ./gradlew evalTest` | Live AI checks against Gemini, including a knowledge-base search for "safe PM2.5 level" and a Coach question about the best time to walk a route (or Groq with `CLEARWAY_EVAL_PROVIDER=groq`). Skipped when the key isn't set. They use their own small budget (`CLEARWAY_EVAL_MAX_REQUESTS`, default 20; `CLEARWAY_EVAL_MAX_TOKENS`, default 20,000) and space calls to stay under `CLEARWAY_EVAL_RPM` (default 5 a minute). Never part of `build` |
 | `cd smart-routes-ui && npm test` | Air-quality bands, wording, and the API client |
 | `cd smart-routes-ui && npm run lint` | Code style and React rules |
 | `cd smart-routes-ui && npm run e2e` | Full browser journey against a running app (set `E2E_BASE_URL=http://localhost:4173` for the Docker version) |
@@ -124,6 +126,7 @@ All endpoints except sign-up, login and health need `Authorization: Bearer <toke
 | `GET /api/v1/routes/{id}/metrics` | Score history, hourly averages, best and worst hour |
 | `GET /api/v1/notifications`, `/unread-count` | Stored alerts |
 | `POST /api/v1/notifications/{id}/read`, `/read-all` | Mark alerts read |
+| `POST /api/v1/coach/chat` | Ask the Coach. Body: `conversationId` (a UUID the client makes up), `message` (1–2,000 characters), optional `timeZone` (IANA, e.g. `Asia/Kolkata`). Returns `answer`, `citations` (title and URL) and `toolsUsed`. 429 over 20 messages an hour, 503 when the AI is unavailable |
 | WebSocket `/ws` → `/user/queue/alerts` | Live alerts (STOMP, token in the connect headers) |
 
 ## Project structure
