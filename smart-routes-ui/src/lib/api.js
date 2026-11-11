@@ -64,12 +64,87 @@ export function errorMessage(error, fallback = 'Something went wrong. Please try
   }
   const { status, data } = error.response;
   if (status === 429) {
+    const seconds = retryAfterSeconds(error.response);
+    if (seconds != null) {
+      const minutes = Math.max(1, Math.ceil(seconds / 60));
+      return `Too many requests. Try again in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}.`;
+    }
     return 'Too many attempts. Please wait a minute and try again.';
+  }
+  // Coach 503s say why in `code`; other services' 503s have no code and fall through to their message.
+  if (status === 503 && data?.code) {
+    switch (data.code) {
+      case 'budget':
+      case 'quota_exhausted':
+        return `Coach has reached today's free limit; it resets ${formatReset(nextPacificMidnight(new Date()))}.`;
+      case 'time_budget':
+        return 'That took too long. Please try again.';
+      default:
+        return 'Coach is offline right now. Please try again later.';
+    }
   }
   if (data && typeof data.message === 'string' && data.message) {
     return data.message;
   }
   return fallback;
+}
+
+/** Seconds from a Retry-After header (seconds or an HTTP date), or null. */
+function retryAfterSeconds(response) {
+  const headers = response.headers ?? {};
+  const raw = typeof headers.get === 'function' ? headers.get('retry-after') : headers['retry-after'] ?? headers['Retry-After'];
+  if (raw == null || raw === '') return null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds);
+  const at = Date.parse(raw);
+  return Number.isNaN(at) ? null : Math.max(0, (at - Date.now()) / 1000);
+}
+
+/** Offset of a time zone from UTC at an instant, in ms (positive east of UTC). */
+function zoneOffsetMs(instant, timeZone) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
+      .formatToParts(instant)
+      .map((p) => [p.type, p.value]),
+  );
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+  return asUtc - Math.floor(instant.getTime() / 1000) * 1000;
+}
+
+/**
+ * The next midnight in US Pacific time, when the Coach's daily allowance (ours and Gemini's
+ * free tier) resets.
+ */
+export function nextPacificMidnight(now, timeZone = 'America/Los_Angeles') {
+  const today = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: 'numeric', day: 'numeric' })
+      .formatToParts(now)
+      .map((p) => [p.type, p.value]),
+  );
+  const wallClock = Date.UTC(+today.year, +today.month - 1, +today.day + 1);
+  // Two passes settle the offset even when midnight falls on a daylight-saving change.
+  let instant = wallClock - zoneOffsetMs(new Date(wallClock), timeZone);
+  instant = wallClock - zoneOffsetMs(new Date(instant), timeZone);
+  return new Date(instant);
+}
+
+/** "at 1:30 PM" today, or "tomorrow at 1:30 PM", in the browser's own time zone. */
+export function formatReset(at, now = new Date()) {
+  const time = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const sameDay = at.toDateString() === now.toDateString();
+  const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toDateString() === at.toDateString();
+  if (sameDay) return `at ${time}`;
+  if (tomorrow) return `tomorrow at ${time}`;
+  return `on ${at.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })} at ${time}`;
 }
 
 const data = (promise) => promise.then((res) => res.data);

@@ -163,7 +163,8 @@ class CoachApiIntegrationTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(header().exists("Retry-After"))
                 .andExpect(jsonPath("$.status").value(429))
-                .andExpect(jsonPath("$.message", containsString("Coach limit")));
+                .andExpect(jsonPath("$.message", containsString("Coach limit")))
+                .andExpect(jsonPath("$.code").doesNotExist());
     }
 
     @Test
@@ -173,7 +174,9 @@ class CoachApiIntegrationTest {
 
         mvc.perform(chat(token, "{\"conversationId\":\"" + UUID.randomUUID() + "\",\"message\":\"hi\"}"))
                 .andExpect(status().isServiceUnavailable())
-                .andExpect(jsonPath("$.status").value(503));
+                .andExpect(jsonPath("$.status").value(503))
+                // So the UI can tell "offline" from "took too long" or "today's limit" without reading the message.
+                .andExpect(jsonPath("$.code").value("provider_error"));
         mvc.perform(auth(get("/api/v1/routes"), token)).andExpect(status().isOk());
         mvc.perform(get("/actuator/health")).andExpect(status().isOk());
     }

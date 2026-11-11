@@ -13,6 +13,7 @@ const RouteDetailPage = lazy(() => import('./pages/RouteDetailPage'));
 const AlertsPage = lazy(() => import('./pages/AlertsPage'));
 const AccountPage = lazy(() => import('./pages/AccountPage'));
 const LandingPage = lazy(() => import('./pages/LandingPage'));
+const CoachPage = lazy(() => import('./pages/CoachPage'));
 
 function RequireAuth({ children }) {
   const { status } = useAuth();
@@ -64,6 +65,7 @@ export default function App() {
         <Route index element={<PlannerPage />} />
         <Route path="routes" element={<RoutesPage />} />
         <Route path="routes/:routeId" element={<RouteDetailPage />} />
+        <Route path="coach" element={<CoachPage />} />
         <Route path="alerts" element={<AlertsPage />} />
         <Route path="account" element={<AccountPage />} />
       </Route>

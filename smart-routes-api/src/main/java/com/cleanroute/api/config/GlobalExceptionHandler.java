@@ -1,6 +1,7 @@
 package com.cleanroute.api.config;
 
 import com.cleanroute.api.dto.ErrorResponse;
+import com.cleanroute.api.ai.AiUnavailableException;
 import com.cleanroute.api.exception.ApiException;
 import com.cleanroute.api.exception.RateLimitedException;
 import org.slf4j.Logger;
@@ -28,6 +29,10 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ErrorResponse> handleApiException(ApiException ex) {
+        if (ex instanceof AiUnavailableException unavailable) {
+            return ResponseEntity.status(ex.getStatus()).body(new ErrorResponse(ex.getStatus().value(),
+                    ex.getStatus().getReasonPhrase(), ex.getMessage(), unavailable.reason().tag()));
+        }
         ResponseEntity<ErrorResponse> response = build(ex.getStatus(), ex.getMessage());
         if (ex instanceof RateLimitedException limited) {
             return ResponseEntity.status(response.getStatusCode())

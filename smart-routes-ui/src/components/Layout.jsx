@@ -9,6 +9,7 @@ import { useAlerts, useAuth } from '../context/contexts';
 const NAV = [
   { to: '/', label: 'Plan', icon: 'map', end: true },
   { to: '/routes', label: 'My routes', icon: 'route' },
+  { to: '/coach', label: 'Coach', icon: 'chat' },
   { to: '/alerts', label: 'Alerts', icon: 'bell', badge: true },
   { to: '/account', label: 'Account', icon: 'user' },
 ];
