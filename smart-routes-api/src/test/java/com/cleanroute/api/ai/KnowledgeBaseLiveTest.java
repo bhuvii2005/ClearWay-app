@@ -46,7 +46,7 @@ class KnowledgeBaseLiveTest {
         AiProperties base = AiTestSettings.forProvider(AiProperties.Provider.GEMINI, key.get(), AiTestSettings.GEMINI_URL, Duration.ofSeconds(30));
         AiProperties settings = new AiProperties(true, base.chat(), base.providers(),
                 new AiProperties.Embedding("gemini-embedding-001", 768, Duration.ofSeconds(30), eval.maxRequests),
-                new AiProperties.KnowledgeBase(true, 4, base.kb().similarityThreshold(), 300, 20, eval.requestsPerMinute),
+                new AiProperties.KnowledgeBase(true, 4, base.kb().similarityThreshold(), 300, 20, eval.requestsPerMinute, 25_000),
                 base.limits());
         EmbeddingService embeddings = new EmbeddingService(settings, CircuitBreakerRegistry.ofDefaults(), BulkheadRegistry.ofDefaults());
 

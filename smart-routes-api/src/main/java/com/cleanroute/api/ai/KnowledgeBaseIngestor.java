@@ -4,6 +4,8 @@ import com.cleanroute.api.exception.ApiException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.tokenizer.JTokkitTokenCountEstimator;
+import org.springframework.ai.tokenizer.TokenCountEstimator;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
@@ -19,7 +21,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -39,6 +40,7 @@ import java.util.Set;
  *       skipped, so a normal restart costs no embedding requests.</li>
  *   <li>Each file is replaced in one database transaction: delete its chunks (by the source_file
  *       metadata filter), then add the new ones in batches, one embedding request per batch, spaced
+ *       ({@link EmbeddingPacer}: requests and tokens per minute)
  *       for the embedding per-minute limit. If any batch fails (a 429, for example) the whole file
  *       rolls back, so no file is ever half-embedded; ingestion stops and the next start-up retries.</li>
  *   <li>Chunks of files that no longer exist are removed.</li>
@@ -60,11 +62,9 @@ public class KnowledgeBaseIngestor {
     private final int dimensions;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
-    private final Sleeper sleeper;
-    private final Duration gap;
+    private final EmbeddingPacer pacer;
+    private final TokenCountEstimator tokens = new JTokkitTokenCountEstimator();
     private final String location;
-    private long lastRequestNanos;
-    private boolean requestSent;
 
     @Autowired
     public KnowledgeBaseIngestor(AiProperties properties, EmbeddingService embeddings, JdbcTemplate jdbc,
@@ -80,8 +80,8 @@ public class KnowledgeBaseIngestor {
         this.store = embeddings.forDocuments().map(gateway -> KnowledgeBaseMetadata.openStore(jdbc, gateway, dimensions));
         this.jdbc = jdbc;
         this.transaction = new TransactionTemplate(transactionManager);
-        this.sleeper = sleeper;
-        this.gap = Duration.ofMinutes(1).dividedBy(settings.embedRequestsPerMinute());
+        this.pacer = new EmbeddingPacer(settings.embedRequestsPerMinute(), settings.embedTokensPerMinute(), sleeper,
+                System::nanoTime);
         this.location = location;
     }
 
@@ -150,7 +150,7 @@ public class KnowledgeBaseIngestor {
             store.get().delete(new FilterExpressionBuilder().eq(KnowledgeBaseMetadata.SOURCE_FILE, file.name()).build());
             for (int from = 0; from < chunks.size(); from += settings.batchSize()) {
                 List<Document> batch = chunks.subList(from, Math.min(chunks.size(), from + settings.batchSize()));
-                pace();
+                pacer.beforeRequest(batch.stream().mapToLong(d -> tokens.estimate(d.getText())).sum());
                 store.get().add(batch);
             }
         });
@@ -178,23 +178,6 @@ public class KnowledgeBaseIngestor {
             chunks.add(new Document(pieces.get(i).getText(), meta));
         }
         return chunks;
-    }
-
-    /** Spaces embedding requests at least 60s / RPM apart, across files too. */
-    private void pace() {
-        if (requestSent) {
-            long waitNanos = gap.toNanos() - (System.nanoTime() - lastRequestNanos);
-            if (waitNanos > 0) {
-                try {
-                    sleeper.sleep(Duration.ofNanos(waitNanos));
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new IllegalStateException("Interrupted while pacing embedding requests", e);
-                }
-            }
-        }
-        requestSent = true;
-        lastRequestNanos = System.nanoTime();
     }
 
     private int removeFilesThatAreGone(List<KnowledgeBaseFile> files, Set<String> storedFiles) {

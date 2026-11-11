@@ -50,7 +50,30 @@ Never commit `.env` or put real values in `.env.example`.
 
 **Coach chat model.** The default is `gemini-3.5-flash-lite` with low reasoning effort: it was the fastest and cheapest in our test, and still used the right tools ([model comparison](docs/coach-model-comparison.md), 11 Nov 2026, single runs). To use another Gemini model, set `GEMINI_CHAT_MODEL` in `.env`. `gemini-3.5-flash` also works, but its free tier allows only 20 requests a day. `gemini-3.8-flash` never replied on the free tier. Each hosted chat call times out after 30 seconds, and a timeout isn't retried.
 
-**AI free-tier limits.** Gemini's free limits are per project and per model (requests per minute, tokens per minute, requests per day) and reset at midnight Pacific. The app keeps its own daily cap of requests and tokens below them, set with `CLEARWAY_AI_DAILY_REQUESTS` and `CLEARWAY_AI_DAILY_TOKENS`; once it's reached, the Coach answers 503 until midnight Pacific. One Coach message can take several requests, and the API logs the chat requests, tokens and embedding requests each message used. Embeddings have their own Gemini quota and their own daily cap (`CLEARWAY_AI_EMBED_DAILY_REQUESTS`). If the provider answers 429 for a per-minute limit, the API retries once after the wait it asks for, then answers 503. If the 429 says the provider's per-day quota is used up, the API stops calling it until midnight Pacific and the Coach answers 503 straight away. The daily request cap defaults to 20 for `gemini-3.5-flash-lite` until the real limits are confirmed.
+**AI free-tier limits.** These are Gemini's free limits, per Google Cloud project, as shown in AI Studio on 11 November 2026. They change, so check AI Studio before relying on them.
+
+| Model | Used for | Requests/min | Tokens/min | Requests/day |
+|---|---|---|---|---|
+| `gemini-3.5-flash-lite` | Coach chat (default) and evals | 15 | 250K | 500 |
+| `gemini-3.1-flash-lite` | Backup chat model (its own quota) | 15 | 250K | 500 |
+| `gemini-embedding-001` | Knowledge-base embeddings | 100 | 30K | 1,000 |
+
+No daily token limit is listed. Daily quotas reset at midnight Pacific. The app keeps its own caps below these:
+- **Chat:** `CLEARWAY_AI_DAILY_REQUESTS` (default 400) and `CLEARWAY_AI_DAILY_TOKENS` (default 2,000,000, only a safety net).
+- **Embeddings:** `CLEARWAY_AI_EMBED_DAILY_REQUESTS` (default 900).
+- **Knowledge-base ingestion pacing:** it stays under `CLEARWAY_AI_EMBED_RPM` (60) requests and `CLEARWAY_AI_EMBED_TPM` (25,000) estimated tokens per minute.
+
+Once a cap is reached, the Coach answers 503 until midnight Pacific.
+
+**The app and the evals share the same daily quota.** `./gradlew evalTest` uses the same key and model, so the 500 requests a day cover both. The app's cap of 400 leaves about 100 for one eval run, and an eval run uses at most 70.
+
+**When Google answers 429:**
+- **Per-minute limit:** the API retries once after the wait Google asks for, then answers 503.
+- **Per-day quota used up:** the API stops calling the provider until midnight Pacific, and the Coach answers 503 straight away.
+
+**Usage log:** the API logs each Coach message's chat requests, tokens, embedding requests, and the model that actually answered. It warns when that model differs from the configured one, because an alias can move to a newer model without notice: in November 2026 `gemini-3.5-flash` was served as `gemini-3.6-flash`.
+
+**Backup model.** If `gemini-3.5-flash-lite` has used today's quota or is misbehaving, set `GEMINI_CHAT_MODEL=gemini-3.1-flash-lite` in `.env` and restart the API (`docker compose up -d api`). It has its own 500 requests a day.
 
 **ClearWay Coach.** `POST /api/v1/coach/chat` answers questions about your saved routes and the air. It can call five read-only tools: list your routes, a route's history (with its cleanest and most polluted hours), current air quality at a point, your pollutant sensitivities, and a knowledge-base search. Tools get your identity from your login, never from the model, so the Coach can't see anyone else's routes. Every number in an answer has to come from a tool, and sources are listed only when the knowledge-base search actually returned them. A message can use at most 5 tool calls. The Coach remembers the last 10 messages of each conversation in memory only, so history is lost when the API restarts, and it's cleared when you delete your account.
 

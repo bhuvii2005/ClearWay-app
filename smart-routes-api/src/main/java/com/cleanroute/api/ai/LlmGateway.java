@@ -33,6 +33,7 @@ public class LlmGateway implements ChatModel {
     private static final Logger log = LoggerFactory.getLogger(LlmGateway.class);
 
     private final Optional<ProviderChatModel> model;
+    private final java.util.Set<String> mismatchesLogged = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final ProviderGuard guard;
 
     @Autowired
@@ -81,8 +82,24 @@ public class LlmGateway implements ChatModel {
         long tokens = totalTokens(response);
         guard.budget().recordTokens(tokens);
         AiUsageTally.recordChatTokens(tokens);
-        log.info("AI chat call: {} ms, {} tokens", (System.nanoTime() - start) / 1_000_000, tokens);
+        String served = servedModel(response);
+        AiUsageTally.recordServedModel(served);
+        if (served != null && !served.equals(target.model()) && mismatchesLogged.add(served)) {
+            // Aliases move silently (Google served gemini-3.5-flash as gemini-3.6-flash), so say it once.
+            log.warn("Configured chat model {} but the provider served {}", target.model(), served);
+        }
+        log.info("AI chat call: {} ms, {} tokens, served model {}", (System.nanoTime() - start) / 1_000_000, tokens,
+                served == null ? "-" : served);
         return response;
+    }
+
+    /** The model name the provider put in its response, without a "models/" prefix; null if absent. */
+    static String servedModel(ChatResponse response) {
+        String model = response == null || response.getMetadata() == null ? null : response.getMetadata().getModel();
+        if (model == null || model.isBlank()) {
+            return null;
+        }
+        return model.startsWith("models/") ? model.substring("models/".length()) : model;
     }
 
     /**

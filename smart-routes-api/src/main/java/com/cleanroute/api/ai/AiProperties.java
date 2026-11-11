@@ -88,7 +88,8 @@ public record AiProperties(
             @DecimalMin("0.0") @DecimalMax("1.0") double similarityThreshold,
             @Min(50) @Max(2000) int chunkSizeTokens,
             @Min(1) @Max(100) int batchSize,
-            @Min(1) int embedRequestsPerMinute) {
+            @Min(1) int embedRequestsPerMinute,
+            @Min(1) int embedTokensPerMinute) {
     }
 
     public record Limits(

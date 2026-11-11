@@ -79,6 +79,8 @@ class CoachWireTest {
                     .call().content();
             assertThat(tally.chatRequests()).isEqualTo(2);
             assertThat(tally.chatTokens()).isEqualTo(15 + 20);
+            // The model the provider reported, not the configured name.
+            assertThat(tally.servedModels()).containsExactly("fake");
         }
 
         assertThat(answer).isEqualTo("You are signed in.");

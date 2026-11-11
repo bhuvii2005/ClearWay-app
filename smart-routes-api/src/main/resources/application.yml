@@ -96,24 +96,27 @@ clearway:
       model: gemini-embedding-001
       dimensions: 768               # V6 creates vector(768); changing this needs a new migration
       timeout: 20s
-      daily-request-budget: ${CLEARWAY_AI_EMBED_DAILY_REQUESTS:500}   # placeholder until the AI Studio numbers
+      daily-request-budget: ${CLEARWAY_AI_EMBED_DAILY_REQUESTS:900}   # free limit is 1,000 a day
     kb:
       ingest-on-startup: ${CLEARWAY_AI_KB_INGEST_ON_STARTUP:true}
       top-k: 4
       similarity-threshold: ${CLEARWAY_AI_KB_SIMILARITY_THRESHOLD:0.6}
       chunk-size-tokens: 300
       batch-size: 20                # chunks per embedding request
-      embed-requests-per-minute: ${CLEARWAY_AI_EMBED_RPM:30}          # ingestion spaces batches 60s / this apart
+      # Ingestion pacing, below gemini-embedding-001's free 100 RPM and 30K TPM (AI Studio, 11 Nov 2026).
+      embed-requests-per-minute: ${CLEARWAY_AI_EMBED_RPM:60}          # batches at least 60s / this apart
+      embed-tokens-per-minute: ${CLEARWAY_AI_EMBED_TPM:25000}         # estimated tokens sent in any minute
     limits:
       messages-per-hour: 20         # per user
       max-input-chars: 2000
       # Our own daily cap, kept below the provider's free quota. Gemini's free limits are per project
       # and per model (RPM / TPM / RPD) and reset at midnight Pacific. Placeholders until the real
       # numbers from the AI Studio console are filled in; one Coach message is several requests.
-      # 20 for gemini-3.5-flash-lite until the AI Studio numbers are in. A per-day 429 from the
-      # provider also stops all calls until the reset, whatever this says.
-      daily-request-budget: ${CLEARWAY_AI_DAILY_REQUESTS:20}
-      daily-token-budget: ${CLEARWAY_AI_DAILY_TOKENS:300000}
+      # gemini-3.5-flash-lite's free limit is 500 a day per project (AI Studio, 11 Nov 2026), shared
+      # with ./gradlew evalTest: 400 leaves room for one eval run. No daily token limit is listed, so
+      # the token cap is only a safety net. A per-day 429 from the provider also stops all calls.
+      daily-request-budget: ${CLEARWAY_AI_DAILY_REQUESTS:400}
+      daily-token-budget: ${CLEARWAY_AI_DAILY_TOKENS:2000000}
       budget-reset-zone: ${CLEARWAY_AI_BUDGET_RESET_ZONE:America/Los_Angeles}
       max-retry-wait: 20s           # a longer Retry-After from the provider means answer 503 straight away
       # Wall-clock budget for one Coach message, all model calls and tools included. Each model call's

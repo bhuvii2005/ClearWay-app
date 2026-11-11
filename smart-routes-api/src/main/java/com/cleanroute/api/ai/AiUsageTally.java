@@ -3,6 +3,9 @@ package com.cleanroute.api.ai;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.LinkedHashSet;
+import java.util.Set;
+
 /**
  * Adds up the provider requests and tokens behind one piece of work, such as one Coach message
  * (which is several LLM calls: tool rounds plus the final answer, and an embedding request per
@@ -25,6 +28,8 @@ public final class AiUsageTally implements AutoCloseable {
     private int chatRequests;
     private long chatTokens;
     private int embeddingRequests;
+    /** The model names the provider reported in its responses (can differ from the configured alias). */
+    private final Set<String> servedModels = new LinkedHashSet<>();
 
     private AiUsageTally(String label, AiUsageTally outer) {
         this.label = label;
@@ -52,6 +57,15 @@ public final class AiUsageTally implements AutoCloseable {
         }
     }
 
+    static void recordServedModel(String model) {
+        if (model == null || model.isBlank()) {
+            return;
+        }
+        for (AiUsageTally t = CURRENT.get(); t != null; t = t.outer) {
+            t.servedModels.add(model);
+        }
+    }
+
     static void recordEmbeddingRequest() {
         for (AiUsageTally t = CURRENT.get(); t != null; t = t.outer) {
             t.embeddingRequests++;
@@ -70,6 +84,10 @@ public final class AiUsageTally implements AutoCloseable {
         return embeddingRequests;
     }
 
+    public Set<String> servedModels() {
+        return Set.copyOf(servedModels);
+    }
+
     @Override
     public void close() {
         if (outer == null) {
@@ -77,7 +95,8 @@ public final class AiUsageTally implements AutoCloseable {
         } else {
             CURRENT.set(outer);
         }
-        log.info("AI usage for {}: {} chat requests, {} chat tokens, {} embedding requests",
-                label, chatRequests, chatTokens, embeddingRequests);
+        log.info("AI usage for {}: {} chat requests, {} chat tokens, {} embedding requests, served model {}",
+                label, chatRequests, chatTokens, embeddingRequests,
+                servedModels.isEmpty() ? "-" : String.join(",", servedModels));
     }
 }

@@ -50,15 +50,15 @@ final class AiTestSettings {
     }
 
     private static AiProperties.Embedding embedding() {
-        return new AiProperties.Embedding("gemini-embedding-001", 768, Duration.ofSeconds(20), 500);
+        return new AiProperties.Embedding("gemini-embedding-001", 768, Duration.ofSeconds(20), 900);
     }
 
     private static AiProperties.KnowledgeBase knowledgeBase(double threshold, int batchSize, int embedRpm) {
-        return new AiProperties.KnowledgeBase(true, 4, threshold, 300, batchSize, embedRpm);
+        return new AiProperties.KnowledgeBase(true, 4, threshold, 300, batchSize, embedRpm, 25_000);
     }
 
     private static AiProperties.Limits limits() {
-        return new AiProperties.Limits(20, 2000, 200, 300_000, ZoneId.of("America/Los_Angeles"), Duration.ofSeconds(20),
+        return new AiProperties.Limits(20, 2000, 400, 2_000_000, ZoneId.of("America/Los_Angeles"), Duration.ofSeconds(20),
                 Duration.ofSeconds(45));
     }
 }
