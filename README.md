@@ -1,4 +1,4 @@
-﻿# ClearWay
+# ClearWay
 
 [![CI](https://github.com/bhuvii2005/ClearWay-app/actions/workflows/ci.yml/badge.svg)](https://github.com/bhuvii2005/ClearWay-app/actions/workflows/ci.yml)
 
