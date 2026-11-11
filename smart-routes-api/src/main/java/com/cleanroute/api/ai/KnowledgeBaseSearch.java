@@ -42,12 +42,37 @@ public class KnowledgeBaseSearch {
         return store.isPresent();
     }
 
+    public double threshold() {
+        return threshold;
+    }
+
+    public int topK() {
+        return topK;
+    }
+
     public List<KnowledgeChunk> search(String query) {
         if (query == null || query.isBlank()) {
             return List.of();
         }
         if (store.isEmpty()) {
             log.debug("Knowledge base search skipped: no embedding model configured");
+            return List.of();
+        }
+        List<KnowledgeChunk> all = ranked(query);
+        List<KnowledgeChunk> hits = all.stream().filter(c -> c.score() >= threshold).toList();
+        // Scores only, never the query text: it is the user's own words.
+        log.info("Knowledge base search: top score {}, {} of {} results at or above the {} threshold",
+                all.isEmpty() ? "none" : String.format(Locale.ROOT, "%.3f", all.get(0).score()),
+                hits.size(), all.size(), threshold);
+        return hits;
+    }
+
+    /**
+     * The top-k chunks for a query, best first, with no similarity cutoff. {@link #search} applies
+     * the threshold to this; the retrieval eval uses it to score several thresholds from one search.
+     */
+    public List<KnowledgeChunk> ranked(String query) {
+        if (store.isEmpty() || query == null || query.isBlank()) {
             return List.of();
         }
         SearchRequest request = SearchRequest.builder()
@@ -57,13 +82,7 @@ public class KnowledgeBaseSearch {
                 .similarityThresholdAll()
                 .filterExpression(new FilterExpressionBuilder().eq(KnowledgeBaseMetadata.EMBEDDING_MODEL, model).build())
                 .build();
-        List<KnowledgeChunk> all = store.get().similaritySearch(request).stream().map(KnowledgeBaseSearch::toChunk).toList();
-        List<KnowledgeChunk> hits = all.stream().filter(c -> c.score() >= threshold).toList();
-        // Scores only, never the query text: it is the user's own words.
-        log.info("Knowledge base search: top score {}, {} of {} results at or above the {} threshold",
-                all.isEmpty() ? "none" : String.format(Locale.ROOT, "%.3f", all.get(0).score()),
-                hits.size(), all.size(), threshold);
-        return hits;
+        return store.get().similaritySearch(request).stream().map(KnowledgeBaseSearch::toChunk).toList();
     }
 
     private static KnowledgeChunk toChunk(Document doc) {

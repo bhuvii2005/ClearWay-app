@@ -68,6 +68,11 @@ public class LlmGateway implements ChatModel {
         return model.map(ProviderChatModel::model);
     }
 
+    /** Today's chat budget (requests, tokens, and whether the provider's daily quota is gone). */
+    public HostedAiBudget budget() {
+        return guard.budget();
+    }
+
     public CircuitBreaker.State circuitState() {
         return guard.circuitState();
     }
@@ -75,7 +80,8 @@ public class LlmGateway implements ChatModel {
     @Override
     public ChatResponse call(Prompt prompt) {
         ProviderChatModel target = model.orElseThrow(() ->
-                ApiException.serviceUnavailable("Coach is offline right now: no AI provider is set up."));
+                new AiUnavailableException(AiUnavailableException.Reason.PROVIDER_ERROR,
+                        "Coach is offline right now: no AI provider is set up."));
         long start = System.nanoTime();
         ChatResponse response = guard.call(() -> target.chatModel().call(withinDeadline(prompt, target)),
                 AiUsageTally::recordChatRequest);

@@ -29,7 +29,7 @@ final class EvalSettings {
         apiKey = DotEnv.get(keyName());
         maxRequests = intSetting("CLEARWAY_EVAL_MAX_REQUESTS", 70);
         maxTokens = intSetting("CLEARWAY_EVAL_MAX_TOKENS", 150_000);
-        requestsPerMinute = intSetting("CLEARWAY_EVAL_RPM", 5);
+        requestsPerMinute = intSetting("CLEARWAY_EVAL_RPM", 12);
     }
 
     static EvalSettings load() {
@@ -47,6 +47,14 @@ final class EvalSettings {
 
     /** A gateway on the real provider, with the eval budget and RPM spacing. */
     LlmGateway gateway(HostedAiBudget budget) {
+        return chat(budget).gateway();
+    }
+
+    /** The eval gateway, plus what the harness reads: the tool outputs of each turn and the pacing waits. */
+    record EvalChat(LlmGateway gateway, RecordingChatModel recorder, PacedChatModel paced, String configuredModel) {
+    }
+
+    EvalChat chat(HostedAiBudget budget) {
         String baseUrl = provider == AiProperties.Provider.GEMINI ? AiTestSettings.GEMINI_URL : AiTestSettings.GROQ_URL;
         // The same model the app would use: GEMINI_CHAT_MODEL from .env, else the application.yml default.
         String geminiModel = DotEnv.get("GEMINI_CHAT_MODEL").map(String::trim).filter(s -> !s.isEmpty())
@@ -58,10 +66,12 @@ final class EvalSettings {
         AiProperties settings = AiTestSettings.forProvider(provider, apiKey.orElseThrow(), baseUrl, Duration.ofSeconds(30),
                 geminiModel, effort);
         ProviderChatModel real = new ChatModelFactory(settings).create().orElseThrow();
-        ProviderChatModel paced = new ProviderChatModel(real.provider(), real.model(),
-                new PacedChatModel(real.chatModel(), requestsPerMinute));
-        return new LlmGateway(Optional.of(paced), budget, CircuitBreaker.ofDefaults("llm-eval"),
+        RecordingChatModel recorder = new RecordingChatModel(real.chatModel());
+        PacedChatModel pacedModel = new PacedChatModel(recorder, requestsPerMinute);
+        ProviderChatModel paced = new ProviderChatModel(real.provider(), real.model(), pacedModel);
+        LlmGateway gateway = new LlmGateway(Optional.of(paced), budget, CircuitBreaker.ofDefaults("llm-eval"),
                 Bulkhead.ofDefaults("llm-eval"), Duration.ofSeconds(20), d -> Thread.sleep(d.toMillis()));
+        return new EvalChat(gateway, recorder, pacedModel, real.model());
     }
 
     private static int intSetting(String name, int fallback) {

@@ -53,7 +53,8 @@ public class HostedAiBudget {
                         name, requests, maxRequests, tokens, name, clock.getZone());
                 warned = true;
             }
-            throw ApiException.serviceUnavailable(USED_UP);
+            throw new AiUnavailableException(providerExhausted
+                    ? AiUnavailableException.Reason.QUOTA_EXHAUSTED : AiUnavailableException.Reason.BUDGET, USED_UP);
         }
     }
 

@@ -1,4 +1,4 @@
-# ClearWay
+﻿# ClearWay
 
 [![CI](https://github.com/bhuvii2005/ClearWay-app/actions/workflows/ci.yml/badge.svg)](https://github.com/bhuvii2005/ClearWay-app/actions/workflows/ci.yml)
 
@@ -6,9 +6,9 @@ ClearWay finds walking, jogging, cycling and driving routes with cleaner air. It
 
 ## Features
 
-- **Compare routes by air quality:** up to three real street routes (TomTom), each scored with live air-quality data (Open-Meteo: European AQI, PM2.5, PM10, NO₂, O₃, CO).
+- **Compare routes by air quality:** up to three real street routes (TomTom), each scored with live air-quality data (Open-Meteo: European AQI, PM2.5, PM10, NOâ‚‚, Oâ‚ƒ, CO).
 - **Address search or map clicks:** place search as you type (Photon, OpenStreetMap), draggable pins, or your current location.
-- **Pollutant sensitivities:** choose pollutants to avoid (PM2.5, PM10, ozone, NO₂) and routes high in them rank lower.
+- **Pollutant sensitivities:** choose pollutants to avoid (PM2.5, PM10, ozone, NOâ‚‚) and routes high in them rank lower.
 - **Saved and watched routes:** a background job re-checks watched routes every 15 minutes.
 - **Live alerts:** sent instantly over a private WebSocket channel and stored, so missed alerts are still listed.
 - **History and best times:** score history, average by hour of day, and the cleanest and worst times to travel.
@@ -77,9 +77,41 @@ Once a cap is reached, the Coach answers 503 until midnight Pacific.
 
 **ClearWay Coach.** `POST /api/v1/coach/chat` answers questions about your saved routes and the air. It can call five read-only tools: list your routes, a route's history (with its cleanest and most polluted hours), current air quality at a point, your pollutant sensitivities, and a knowledge-base search. Tools get your identity from your login, never from the model, so the Coach can't see anyone else's routes. Every number in an answer has to come from a tool, and sources are listed only when the knowledge-base search actually returned them. A message can use at most 5 tool calls. The Coach remembers the last 10 messages of each conversation in memory only, so history is lost when the API restarts, and it's cleared when you delete your account.
 
-**Coach speed and timeouts.** Each Coach call asks the model for low reasoning effort (`CLEARWAY_AI_REASONING_EFFORT`, default `low`; leave it blank for the model's own default), which uses fewer tokens. One message also has a total time budget, `CLEARWAY_AI_COACH_TOTAL_TIMEOUT` (default 45 s). Each model call's 30-second timeout is cut to whatever is left, and once the budget runs out no further model call or tool is started and the Coach answers 503, so a slow model can't keep a message open for 5 × 30 seconds. A tool that's already running when time runs out finishes first, which adds at most 20 seconds and usually about 1. The browser's Coach timeout (`COACH_TIMEOUT_MS` in `smart-routes-ui/src/lib/api.js`, 75 s) is set above that. Nothing else in between has a shorter limit: the UI calls the API directly (nginx only serves the built UI files), and the Coach endpoint runs synchronously, so Spring's async request timeout doesn't apply. If you raise the budget, raise `COACH_TIMEOUT_MS` too.
+**Coach speed and timeouts.** Each Coach call asks the model for low reasoning effort (`CLEARWAY_AI_REASONING_EFFORT`, default `low`; leave it blank for the model's own default), which uses fewer tokens. One message also has a total time budget, `CLEARWAY_AI_COACH_TOTAL_TIMEOUT` (default 45 s). Each model call's 30-second timeout is cut to whatever is left, and once the budget runs out no further model call or tool is started and the Coach answers 503, so a slow model can't keep a message open for 5 Ã— 30 seconds. A tool that's already running when time runs out finishes first, which adds at most 20 seconds and usually about 1. The browser's Coach timeout (`COACH_TIMEOUT_MS` in `smart-routes-ui/src/lib/api.js`, 75 s) is set above that. Nothing else in between has a shorter limit: the UI calls the API directly (nginx only serves the built UI files), and the Coach endpoint runs synchronously, so Spring's async request timeout doesn't apply. If you raise the budget, raise `COACH_TIMEOUT_MS` too.
 
 **Actuator.** `/actuator/health` is public; Docker's health check uses it. `/actuator/metrics` and `/actuator/info` need HTTP Basic with `CLEARWAY_METRICS_USER` and `CLEARWAY_METRICS_PASSWORD` from `.env` (password at least 12 characters). There are no default credentials: if they aren't set, those endpoints are switched off. They have their own security chain, so an app user's login token doesn't open them. Example: `curl -u "$CLEARWAY_METRICS_USER:$CLEARWAY_METRICS_PASSWORD" http://localhost:8090/actuator/metrics`.
+
+**Coach metrics and logs.** These are under `/actuator/metrics`, behind the actuator login.
+- **Spring AI's own model metrics:**
+  - `gen_ai.client.operation`: the duration of each model call.
+  - `gen_ai.client.token.usage`: the tokens each call used.
+- **The Coach's counters:**
+  - `coach.tool.calls{tool,outcome}`: outcome is `ok`, `invalid`, `not_found`, `unavailable`, `out_of_time` or `error`.
+  - `coach.fallbacks{reason}`: reason is `budget`, `quota_exhausted`, `time_budget`, `provider_error`, `tool_cap` or `rate_limit`.
+  - `kb.search{result}`: result is `hit`, `empty` or `error`.
+- **Today's use of each daily cap:** `clearway.ai.budget.requests{budget=chat|embedding}`, `clearway.ai.budget.tokens{budget=chat}` and `clearway.ai.budget.exhausted{budget}`.
+
+Each Coach message also writes one log line:
+
+`coach_message conversation=â€¦ provider=â€¦ model=â€¦ served_model=â€¦ chat_requests=â€¦ tokens=â€¦ embedding_requests=â€¦ latency_ms=â€¦ tools=â€¦ outcome=â€¦`
+
+It holds ids, counts and names only. The question, the answer and keys are never logged.
+
+**Evals.** `./gradlew evalTest` runs the live checks:
+- **Coach golden set:** 20 cases in `smart-routes-api/src/test/resources/evals/coach-golden.yaml`, split into tool selection (8), grounding (4), knowledge-base citations (4), and safety and security (4).
+- **Retrieval eval:** 10 queries with an expected source file, plus 5 off-topic queries.
+
+They run against the real model, on fixed seeded data in a throwaway database, with Open-Meteo and TomTom mocked. Scoring is deterministic, with no judge model:
+- the right tools were called
+- citations are real knowledge-base sources returned in that turn
+- every number in a grounding answer appears in that turn's tool output
+- required and forbidden text
+
+Retrieval reports recall@4, MRR and the off-topic false-positive rate at thresholds 0.50â€“0.65. The report goes to `smart-routes-api/build/reports/evals/summary.md`, and the first full run is kept as [docs/evals/baseline.md](docs/evals/baseline.md).
+
+A run uses at most `CLEARWAY_EVAL_MAX_REQUESTS` (70) chat requests, spaced at `CLEARWAY_EVAL_RPM` (12 a minute). If the budget or the provider's daily quota runs out partway, the run stops: the remaining cases are marked "not run" and the report is still written. Before starting, it asks the running app how many chat requests it has used today (`CLEARWAY_EVAL_APP_URL`, default `http://localhost:8090`, with the actuator login). If that's more than `CLEARWAY_EVAL_APP_LIMIT` (400), the run refuses. Because the quota is shared, run the golden set at most once a day.
+
+On GitHub, the **Evals** workflow (run it by hand from the Actions tab) does the same. It uses the provider in `CLEARWAY_EVAL_PROVIDER` with the `GEMINI_API_KEY` or `GROQ_API_KEY` repository secret, skips with a notice when the secret is missing, and uploads `summary.md`.
 
 **Coach knowledge base.** Five short guidance files in [`smart-routes-api/src/main/resources/kb/`](smart-routes-api/src/main/resources/kb/) (WHO guideline levels, European AQI bands, health effects, exercising in poor air, how ClearWay scores routes) are embedded with Gemini and stored in the `vector_store` table (migration V6, pgvector). This happens in the background at start-up, and only for files that are new or changed, so a normal restart uses no embedding requests. Each file is stored all-or-nothing: if Gemini answers 429 partway through, that file is left as it was and is retried on the next start-up. Without `GEMINI_API_KEY` the knowledge base is simply off.
 
@@ -118,8 +150,8 @@ The API reads the root `.env` automatically. On Windows, if Java 17 is not the d
 
 | Command | What it checks |
 |---|---|
-| `cd smart-routes-api && ./gradlew test` | 117 tests: services, security, the AI gateway, limits, knowledge base and Coach (scripted models and a fake provider on localhost, no internet), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
-| `cd smart-routes-api && ./gradlew evalTest` | Live AI checks against Gemini, including a knowledge-base search for "safe PM2.5 level" and a Coach question about the best time to walk a route (or Groq with `CLEARWAY_EVAL_PROVIDER=groq`). Skipped when the key isn't set. They use their own small budget (`CLEARWAY_EVAL_MAX_REQUESTS`, default 70; `CLEARWAY_EVAL_MAX_TOKENS`, default 150,000) and space calls to stay under `CLEARWAY_EVAL_RPM` (default 5 a minute). Never part of `build` |
+| `cd smart-routes-api && ./gradlew test` | 141 tests: services, security, the AI gateway, limits, knowledge base and Coach (scripted models and a fake provider on localhost, no internet), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
+| `cd smart-routes-api && ./gradlew evalTest` | Live AI checks (see **Evals** above): the 20-case Coach golden set, the retrieval eval, and a few quick live checks of the gateway, the knowledge base and the Coach. They need `GEMINI_API_KEY`, use at most 70 chat requests a run at 12 a minute, and write `build/reports/evals/summary.md`. Run them at most once a day, because the app shares the quota. Never part of `build` |
 | `cd smart-routes-ui && npm test` | Air-quality bands, wording, and the API client |
 | `cd smart-routes-ui && npm run lint` | Code style and React rules |
 | `cd smart-routes-ui && npm run e2e` | Full browser journey against a running app (set `E2E_BASE_URL=http://localhost:4173` for the Docker version). It uses the real outside services (Photon place search, TomTom, Open-Meteo), so it sometimes fails at those steps when one is slow or briefly unreachable; run it again before suspecting the app |
@@ -153,8 +185,8 @@ All endpoints except sign-up, login and health need `Authorization: Bearer <toke
 | `GET /api/v1/routes/{id}/metrics` | Score history, hourly averages, best and worst hour |
 | `GET /api/v1/notifications`, `/unread-count` | Stored alerts |
 | `POST /api/v1/notifications/{id}/read`, `/read-all` | Mark alerts read |
-| `POST /api/v1/coach/chat` | Ask the Coach. Body: `conversationId` (a UUID the client makes up), `message` (1–2,000 characters), optional `timeZone` (IANA, e.g. `Asia/Kolkata`). Returns `answer`, `citations` (title and URL) and `toolsUsed`. 429 over 20 messages an hour, 503 when the AI is unavailable |
-| WebSocket `/ws` → `/user/queue/alerts` | Live alerts (STOMP, token in the connect headers) |
+| `POST /api/v1/coach/chat` | Ask the Coach. Body: `conversationId` (a UUID the client makes up), `message` (1â€“2,000 characters), optional `timeZone` (IANA, e.g. `Asia/Kolkata`). Returns `answer`, `citations` (title and URL) and `toolsUsed`. 429 over 20 messages an hour, 503 when the AI is unavailable |
+| WebSocket `/ws` â†’ `/user/queue/alerts` | Live alerts (STOMP, token in the connect headers) |
 
 ## Project structure
 

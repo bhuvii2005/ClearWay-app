@@ -71,26 +71,28 @@ final class ProviderGuard {
         try {
             return Bulkhead.decorateSupplier(bulkhead, () -> withCircuitBreaker(counted)).get();
         } catch (BulkheadFullException e) {
-            throw ApiException.serviceUnavailable("Coach is busy right now. Please try again in a moment.");
+            throw new AiUnavailableException(AiUnavailableException.Reason.PROVIDER_ERROR,
+                    "Coach is busy right now. Please try again in a moment.");
         } catch (CallNotPermittedException e) {
-            throw ApiException.serviceUnavailable("Coach is offline for a moment. Please try again in a minute.");
+            throw new AiUnavailableException(AiUnavailableException.Reason.PROVIDER_ERROR,
+                    "Coach is offline for a moment. Please try again in a minute.");
         } catch (ApiException e) {
             throw e;
         } catch (RuntimeException e) {
             if (AiDeadline.expired()) {
                 // Our time budget ran out (the call's timeout was cut to fit it); not a provider fault.
                 log.info("AI {} call stopped: the time budget ran out ({})", name, e.getClass().getSimpleName());
-                throw ApiException.serviceUnavailable(AiDeadline.OUT_OF_TIME);
+                throw new AiUnavailableException(AiUnavailableException.Reason.TIME_BUDGET, AiDeadline.OUT_OF_TIME);
             }
             ProviderFailure failure = ProviderFailure.of(e);
             if (failure.dailyQuota()) {
                 budget.markExhaustedForToday();
-                throw ApiException.serviceUnavailable(HostedAiBudget.USED_UP);
+                throw new AiUnavailableException(AiUnavailableException.Reason.QUOTA_EXHAUSTED, HostedAiBudget.USED_UP);
             }
             // Status only: provider messages can echo the request, and the request may hold user text.
             log.warn("AI {} call failed (status {}, {})", name,
                     failure.status() == 0 ? "network/timeout" : failure.status(), e.getClass().getSimpleName());
-            throw ApiException.serviceUnavailable(failure.rateLimited()
+            throw new AiUnavailableException(AiUnavailableException.Reason.PROVIDER_ERROR, failure.rateLimited()
                     ? "Coach is busy right now (the free AI limit was reached). Please try again in a minute."
                     : "Coach is offline right now. Please try again later.");
         }

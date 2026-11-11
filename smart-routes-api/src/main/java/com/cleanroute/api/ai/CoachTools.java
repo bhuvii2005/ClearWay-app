@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.model.ToolContext;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
@@ -47,13 +48,21 @@ public class CoachTools {
     private final UserRepository users;
     private final OpenMeteoAqiClient airQuality;
     private final KnowledgeBaseSearch knowledgeBase;
+    private final CoachMetrics metrics;
 
+    @Autowired
     public CoachTools(RouteService routes, UserRepository users, OpenMeteoAqiClient airQuality,
-                      KnowledgeBaseSearch knowledgeBase) {
+                      KnowledgeBaseSearch knowledgeBase, CoachMetrics metrics) {
         this.routes = routes;
         this.users = users;
         this.airQuality = airQuality;
         this.knowledgeBase = knowledgeBase;
+        this.metrics = metrics;
+    }
+
+    /** For tests and evals built by hand: counters go nowhere. */
+    CoachTools(RouteService routes, UserRepository users, OpenMeteoAqiClient airQuality, KnowledgeBaseSearch knowledgeBase) {
+        this(routes, users, airQuality, knowledgeBase, CoachMetrics.detached());
     }
 
     // ------------------------------------------------------------------ tools
@@ -132,14 +141,17 @@ public class CoachTools {
                 throw invalid("query must be at most " + MAX_QUERY_CHARS + " characters");
             }
             if (!knowledgeBase.isAvailable()) {
+                metrics.knowledgeBaseSearch("error");
                 return new Unavailable("unavailable", "The knowledge base is not available right now.");
             }
             List<KnowledgeChunk> chunks;
             try {
                 chunks = knowledgeBase.search(query);
             } catch (ApiException e) {
+                metrics.knowledgeBaseSearch("error");
                 return new Unavailable("unavailable", "The knowledge base is not available right now.");
             }
+            metrics.knowledgeBaseSearch(chunks.isEmpty() ? "empty" : "hit");
             turn.retrieved(chunks);
             List<Passage> passages = chunks.stream().map(c -> new Passage(c.title(), c.text())).toList();
             return passages.isEmpty()
@@ -163,18 +175,24 @@ public class CoachTools {
         turn.toolUsed(name);
         if (AiDeadline.expired()) {
             // The message's time budget is spent; the next model call will end it with a 503.
+            metrics.toolCall(name, "out_of_time");
             return new ToolError("Out of time for this question.");
         }
         try {
-            return body.apply(turn);
+            Object result = body.apply(turn);
+            metrics.toolCall(name, result instanceof Unavailable ? "unavailable" : "ok");
+            return result;
         } catch (ApiException e) {
             if (e.getStatus() == HttpStatus.NOT_FOUND || e.getStatus() == HttpStatus.BAD_REQUEST) {
+                metrics.toolCall(name, e.getStatus() == HttpStatus.NOT_FOUND ? "not_found" : "invalid");
                 return new ToolError(e.getMessage());
             }
             log.warn("Coach tool {} failed: {}", name, e.getStatus());
+            metrics.toolCall(name, "error");
             return new ToolError("This information is unavailable right now.");
         } catch (RuntimeException e) {
             log.warn("Coach tool {} failed: {}", name, e.getClass().getSimpleName());
+            metrics.toolCall(name, "error");
             return new ToolError("This information is unavailable right now.");
         }
     }

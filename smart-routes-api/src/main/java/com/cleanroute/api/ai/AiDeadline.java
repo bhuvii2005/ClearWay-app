@@ -60,7 +60,7 @@ public final class AiDeadline implements AutoCloseable {
     /** Throws 503 when the current deadline has (nearly) run out. */
     static void ensureTimeLeft() {
         if (expired()) {
-            throw ApiException.serviceUnavailable(OUT_OF_TIME);
+            throw new AiUnavailableException(AiUnavailableException.Reason.TIME_BUDGET, OUT_OF_TIME);
         }
     }
 

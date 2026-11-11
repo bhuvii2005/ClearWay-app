@@ -14,6 +14,7 @@ final class PacedChatModel implements ChatModel {
     private final long gapNanos;
     private long lastCall;
     private boolean called;
+    private long waitedNanos;
 
     PacedChatModel(ChatModel delegate, int requestsPerMinute) {
         this.delegate = delegate;
@@ -25,6 +26,7 @@ final class PacedChatModel implements ChatModel {
         if (called) {
             long wait = gapNanos - (System.nanoTime() - lastCall);
             if (wait > 0) {
+                waitedNanos += wait;
                 try {
                     Thread.sleep(wait / 1_000_000, (int) (wait % 1_000_000));
                 } catch (InterruptedException e) {
@@ -39,6 +41,11 @@ final class PacedChatModel implements ChatModel {
             called = true;
             lastCall = System.nanoTime();
         }
+    }
+
+    /** Total time spent pausing for the RPM limit, so reports can leave it out of latency. */
+    synchronized long waitedNanos() {
+        return waitedNanos;
     }
 
     @Override

@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -67,19 +68,28 @@ public class CoachService {
     /** Wall-clock budget for one message, all model calls and tools included ({@link AiDeadline}). */
     private final Duration totalTimeout;
     private final Clock clock;
+    private final CoachMetrics metrics;
 
     @Autowired
     public CoachService(LlmGateway gateway, CoachRateLimiter rateLimiter, CoachMemory memory, CoachTools tools,
                         AiProperties properties, ObjectProvider<ObservationRegistry> observations,
-                        @Value("classpath:prompts/coach-system.st") Resource systemPrompt) {
+                        @Value("classpath:prompts/coach-system.st") Resource systemPrompt, CoachMetrics metrics) {
         this(gateway, rateLimiter, memory, new Object[] {tools},
                 properties.limits().maxInputChars(), properties.limits().coachTotalTimeout(),
-                observations.getIfAvailable(() -> ObservationRegistry.NOOP), read(systemPrompt), Clock.systemUTC());
+                observations.getIfAvailable(() -> ObservationRegistry.NOOP), read(systemPrompt), Clock.systemUTC(), metrics);
     }
 
     CoachService(LlmGateway gateway, CoachRateLimiter rateLimiter, CoachMemory memory, Object[] tools,
                  int maxInputChars, Duration totalTimeout, ObservationRegistry observations, String systemTemplate,
                  Clock clock) {
+        this(gateway, rateLimiter, memory, tools, maxInputChars, totalTimeout, observations, systemTemplate, clock,
+                CoachMetrics.detached());
+    }
+
+    CoachService(LlmGateway gateway, CoachRateLimiter rateLimiter, CoachMemory memory, Object[] tools,
+                 int maxInputChars, Duration totalTimeout, ObservationRegistry observations, String systemTemplate,
+                 Clock clock, CoachMetrics metrics) {
+        this.metrics = metrics;
         this.gateway = gateway;
         this.totalTimeout = totalTimeout;
         this.rateLimiter = rateLimiter;
@@ -115,9 +125,18 @@ public class CoachService {
         }
         ZoneId zone = parseZone(timeZone);
         if (!gateway.isConfigured()) {
-            throw ApiException.serviceUnavailable("Coach is offline right now: no AI provider is set up.");
+            metrics.fallback(AiUnavailableException.Reason.PROVIDER_ERROR.tag());
+            throw new AiUnavailableException(AiUnavailableException.Reason.PROVIDER_ERROR,
+                    "Coach is offline right now: no AI provider is set up.");
         }
-        rateLimiter.acquire(userId);
+        try {
+            rateLimiter.acquire(userId);
+        } catch (ApiException e) {
+            if (e.getStatus() == HttpStatus.TOO_MANY_REQUESTS) {
+                metrics.fallback("rate_limit");
+            }
+            throw e;
+        }
 
         List<Message> history = memory.get(userId, conversationId);
         List<Message> messages = new ArrayList<>(history.size() + 2);
@@ -126,24 +145,50 @@ public class CoachService {
         messages.add(new UserMessage(text));
 
         CoachTurn turn = new CoachTurn(userId, zone);
-        String answer;
-        List<CoachTurn.Citation> citations;
-        try (AiUsageTally ignored = AiUsageTally.open("coach message");
-             AiDeadline deadline = AiDeadline.start(totalTimeout)) {
+        String answer = null;
+        List<CoachTurn.Citation> citations = List.of();
+        String outcome = "error";
+        long start = System.nanoTime();
+        AiUsageTally tally = AiUsageTally.open("coach message");
+        try (tally; AiDeadline deadline = AiDeadline.start(totalTimeout)) {
             ChatResponse response = ask(messages, turn);
             if (hitToolLimit(response)) {
-                log.info("Coach stopped after {} tool calls", MAX_TOOL_CALLS);
+                outcome = "tool_cap";
+                metrics.fallback("tool_cap");
                 answer = TOOL_LIMIT_ANSWER;
-                citations = List.of();
             } else {
                 String content = answerText(response);
+                outcome = content.isBlank() ? "empty_answer" : "answered";
                 answer = content.isBlank() ? EMPTY_ANSWER : content.strip();
                 citations = turn.citations();
             }
+        } catch (AiUnavailableException e) {
+            outcome = e.reason().tag();
+            metrics.fallback(outcome);
+            throw e;
+        } finally {
+            logMessage(conversationId, tally, turn, start, outcome);
         }
         // Only the question and the final answer are remembered; tool rounds are not.
         memory.add(userId, conversationId, List.of(new UserMessage(text), new AssistantMessage(answer)));
         return new CoachReply(answer, citations, turn.toolsUsed());
+    }
+
+    /**
+     * One structured line per Coach message, for dashboards and debugging. Ids, counts and names
+     * only: never the question, the answer or any key.
+     */
+    private void logMessage(UUID conversationId, AiUsageTally tally, CoachTurn turn, long startNanos, String outcome) {
+        log.info("coach_message conversation={} provider={} model={} served_model={} chat_requests={} tokens={} "
+                        + "embedding_requests={} latency_ms={} tools={} outcome={}",
+                conversationId,
+                gateway.provider().map(p -> p.name().toLowerCase(Locale.ROOT)).orElse("none"),
+                gateway.modelName().orElse("none"),
+                tally.servedModels().isEmpty() ? "-" : String.join(",", new java.util.TreeSet<>(tally.servedModels())),
+                tally.chatRequests(), tally.chatTokens(), tally.embeddingRequests(),
+                (System.nanoTime() - startNanos) / 1_000_000,
+                turn.toolsUsed().isEmpty() ? "-" : String.join(",", turn.toolsUsed()),
+                outcome);
     }
 
     private ChatResponse ask(List<Message> messages, CoachTurn turn) {
@@ -163,7 +208,8 @@ public class CoachService {
                 return null; // treated as hitting the limit
             }
             log.warn("Coach message failed: {}", e.getClass().getSimpleName(), e);
-            throw ApiException.serviceUnavailable("Coach is offline right now. Please try again later.");
+            throw new AiUnavailableException(AiUnavailableException.Reason.PROVIDER_ERROR,
+                    "Coach is offline right now. Please try again later.");
         }
     }
 

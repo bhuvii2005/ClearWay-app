@@ -92,6 +92,45 @@ class CoachWireTest {
         assertThat(requestBodies.get(1)).contains("\"role\":\"tool\"").contains("call_1").contains(user.toString());
     }
 
+    @Test
+    void modelCalls_AreObserved_ForSpringAisDurationAndTokenMetrics() throws IOException {
+        server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/", exchange -> {
+            exchange.getRequestBody().readAllBytes();
+            byte[] bytes = FINAL_ANSWER.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+                out.write(bytes);
+            }
+        });
+        server.start();
+        String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort() + "/v1/";
+        AiProperties settings = AiTestSettings.forProvider(AiProperties.Provider.GEMINI, "test-key-not-real", baseUrl,
+                Duration.ofSeconds(5));
+        List<String> observed = new CopyOnWriteArrayList<>();
+        ObservationRegistry registry = ObservationRegistry.create();
+        registry.observationConfig().observationHandler(new io.micrometer.observation.ObservationHandler<>() {
+            @Override
+            public boolean supportsContext(io.micrometer.observation.Observation.Context context) {
+                return true;
+            }
+
+            @Override
+            public void onStop(io.micrometer.observation.Observation.Context context) {
+                observed.add(context.getName());
+            }
+        });
+        ProviderChatModel model = new ChatModelFactory(settings, new org.springframework.beans.factory.support
+                .StaticListableBeanFactory(Map.of("registry", registry)).getBeanProvider(ObservationRegistry.class))
+                .create().orElseThrow();
+
+        model.chatModel().call(new org.springframework.ai.chat.prompt.Prompt("hi"));
+
+        // gen_ai.client.operation is the observation Spring AI turns into the duration and token metrics.
+        assertThat(observed).contains("gen_ai.client.operation");
+    }
+
     private static final String TOOL_CALL = """
             {"id":"r1","object":"chat.completion","created":1,"model":"fake",
              "choices":[{"index":0,"finish_reason":"tool_calls","message":{"role":"assistant","content":null,
