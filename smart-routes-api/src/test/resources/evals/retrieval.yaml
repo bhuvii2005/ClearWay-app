@@ -1,5 +1,5 @@
 # Retrieval eval: each query has the knowledge-base file (src/main/resources/kb/) that should be in the
-# top 4. The off-topic queries should find nothing above the threshold.
+# top 4 (10 close to the files' wording, 5 casual paraphrases). The off-topic queries should find nothing above the threshold.
 queries:
   - query: "What is a safe level of PM2.5 according to the WHO?"
     expectedFile: who-air-quality-guidelines.md
@@ -20,6 +20,17 @@ queries:
   - query: "How does ClearWay rank routes by exposure?"
     expectedFile: how-clearway-scores-routes.md
   - query: "When does ClearWay send a poor air alert for a saved route?"
+    expectedFile: how-clearway-scores-routes.md
+  # Casual paraphrases, deliberately not using the knowledge-base files' own wording (added 11 Nov 2026).
+  - query: "is the tiny dust stuff in the air actually bad for me or is that overblown"
+    expectedFile: pollutant-health-effects.md
+  - query: "my app says the air is orange today, what does that even mean"
+    expectedFile: european-aqi-bands.md
+  - query: "how much of the small particle junk is ok to breathe per year"
+    expectedFile: who-air-quality-guidelines.md
+  - query: "gym outside or skip it when the city is all hazy"
+    expectedFile: exercising-in-poor-air.md
+  - query: "why did my bike way to the office get a worse number than the other option"
     expectedFile: how-clearway-scores-routes.md
 offTopic:
   - "Best pizza restaurants in Naples"

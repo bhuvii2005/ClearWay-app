@@ -33,7 +33,8 @@ public final class EvalReport {
      */
     public record Retrieval(int k, List<RetrievalScoring.Row> rows, RetrievalScoring.Row recommended,
                             double currentThreshold, int onTopicQueries, int offTopicQueries,
-                            double lowestExpectedScore, double highestOffTopicScore) {
+                            double lowestExpectedScore, double highestOffTopicScore,
+                            List<RetrievalScoring.QueryRank> perQuery) {
     }
 
     public static Path write(Path file, RunInfo info, List<CaseResult> results, Retrieval retrieval) {
@@ -52,11 +53,15 @@ public final class EvalReport {
         md.append("| | |\n|---|---|\n");
         md.append("| Run at | ").append(info.startedAt().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm z"))).append(" |\n");
         md.append("| Provider | ").append(info.provider()).append(" |\n");
-        md.append("| Configured model | `").append(info.configuredModel()).append("` |\n");
-        md.append("| Served model | ").append(info.servedModels().isEmpty() ? "-"
-                : info.servedModels().stream().sorted().map(m -> "`" + m + "`").collect(Collectors.joining(", "))).append(" |\n");
-        md.append("| Chat requests | ").append(info.chatRequests()).append(" of ").append(info.maxRequests()).append(" allowed |\n");
-        md.append("| Chat tokens | ").append(String.format(Locale.ROOT, "%,d", info.chatTokens())).append(" |\n");
+        if (info.maxRequests() == 0) {
+            md.append("| Chat requests | none (retrieval-only run) |\n");
+        } else {
+            md.append("| Configured model | `").append(info.configuredModel()).append("` |\n");
+            md.append("| Served model | ").append(info.servedModels().isEmpty() ? "-"
+                    : info.servedModels().stream().sorted().map(m -> "`" + m + "`").collect(Collectors.joining(", "))).append(" |\n");
+            md.append("| Chat requests | ").append(info.chatRequests()).append(" of ").append(info.maxRequests()).append(" allowed |\n");
+            md.append("| Chat tokens | ").append(String.format(Locale.ROOT, "%,d", info.chatTokens())).append(" |\n");
+        }
         md.append("| Embedding requests | ").append(info.embeddingRequests()).append(" |\n");
         List<CaseResult> ran = results.stream().filter(r -> r.status() != Status.NOT_RUN).toList();
         if (!ran.isEmpty()) {
@@ -79,6 +84,18 @@ public final class EvalReport {
                     .append(". Pass rates below count only the cases that ran.\n\n");
         }
 
+        if (results.isEmpty()) {
+            md.append("**Golden set not run** (retrieval-only run).\n");
+        } else {
+            golden(md, results, ran);
+        }
+        if (retrieval != null) {
+            retrieval(md, retrieval);
+        }
+        return md.toString();
+    }
+
+    private static void golden(StringBuilder md, List<CaseResult> results, List<CaseResult> ran) {
         md.append("## Golden set\n\n");
         md.append("| Category | Passed | Failed | Not run | Pass rate | Target | Met |\n|---|---|---|---|---|---|---|\n");
         for (Category c : Category.values()) {
@@ -120,8 +137,10 @@ public final class EvalReport {
                 }
             }
         }
+    }
 
-        if (retrieval != null) {
+    private static void retrieval(StringBuilder md, Retrieval retrieval) {
+        {
             md.append("\n## Retrieval\n\n");
             md.append(retrieval.onTopicQueries()).append(" queries with an expected source file, and ")
                     .append(retrieval.offTopicQueries()).append(" off-topic queries that should find nothing.\n\n");
@@ -133,13 +152,21 @@ public final class EvalReport {
                         .append(String.format(Locale.ROOT, "%.2f", row.mrr())).append(" | ")
                         .append(percent(row.offTopicFalsePositiveRate())).append(" |\n");
             }
-            md.append(String.format(Locale.ROOT, "%nScores: the expected file's lowest score was %.3f; the best off-topic score was %.3f.%n",
+            md.append(String.format(Locale.ROOT, "\nScores: the expected file's lowest score was %.3f; the best off-topic score was %.3f.\n",
                     retrieval.lowestExpectedScore(), retrieval.highestOffTopicScore()));
             md.append("\n**Suggested threshold:** ").append(String.format(Locale.ROOT, "%.2f", retrieval.recommended().threshold()))
                     .append(" (the fewest off-topic false positives while recall@").append(retrieval.k())
                     .append(" stays at or above 80%). Not applied automatically.\n");
+            if (!retrieval.perQuery().isEmpty()) {
+                md.append("\n| Query | Expected file | Rank in top ").append(retrieval.k()).append(" | Score |\n|---|---|---|---|\n");
+                for (RetrievalScoring.QueryRank q : retrieval.perQuery()) {
+                    md.append("| ").append(oneLine(q.query())).append(" | ").append(q.expectedFile()).append(" | ")
+                            .append(q.rank() == 0 ? "not found" : String.valueOf(q.rank())).append(" | ")
+                            .append(Double.isNaN(q.score()) ? "-" : String.format(Locale.ROOT, "%.3f", q.score()))
+                            .append(" |\n");
+                }
+            }
         }
-        return md.toString();
     }
 
     private static String percent(double value) {

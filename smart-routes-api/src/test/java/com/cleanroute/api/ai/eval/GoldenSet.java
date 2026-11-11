@@ -38,14 +38,15 @@ public final class GoldenSet {
      */
     public record Case(String id, Category category, String user, String message, List<String> expectTools,
                        boolean ordered, List<String> mustContain, List<String> mustNotContain,
-                       boolean citationsRequired, boolean grounding, List<String> toolOutputMustContain) {
+                       boolean citationsRequired, boolean grounding, List<String> toolOutputMustContain,
+                       Behaviour behaviour) {
 
         public Case withPlaceholders(Map<String, String> values) {
             return new Case(id, category, user, fill(message, values), expectTools, ordered,
                     mustContain.stream().map(p -> fill(p, values)).toList(),
                     mustNotContain.stream().map(p -> fill(p, values)).toList(),
                     citationsRequired, grounding,
-                    toolOutputMustContain.stream().map(p -> fill(p, values)).toList());
+                    toolOutputMustContain.stream().map(p -> fill(p, values)).toList(), behaviour);
         }
 
         private static String fill(String text, Map<String, String> values) {
@@ -55,6 +56,15 @@ public final class GoldenSet {
             }
             return out;
         }
+    }
+
+    /** A behaviour check run on top of the text checks (see {@link EvalScoring}). */
+    public enum Behaviour {
+        NONE,
+        /** checkForeignRouteHidden: another user's route is "not found" and nothing about it leaks. */
+        FOREIGN_ROUTE_HIDDEN,
+        /** checkNoUsableHistory: no/too little data, and no invented hour or score. */
+        NO_USABLE_HISTORY
     }
 
     public record RetrievalQuery(String query, String expectedFile) {
@@ -77,7 +87,8 @@ public final class GoldenSet {
                     strings(m.get("mustNotContain")),
                     Boolean.TRUE.equals(m.get("citationsRequired")),
                     Boolean.TRUE.equals(m.get("grounding")),
-                    strings(m.get("toolOutputMustContain"))));
+                    strings(m.get("toolOutputMustContain")),
+                    Behaviour.valueOf(m.getOrDefault("behaviour", "none").toString().toUpperCase(java.util.Locale.ROOT))));
         }
         return cases;
     }

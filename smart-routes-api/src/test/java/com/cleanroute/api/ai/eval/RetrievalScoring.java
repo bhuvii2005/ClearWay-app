@@ -20,6 +20,28 @@ public final class RetrievalScoring {
     public record Ranked(String query, String expectedFile, List<Hit> hits) {
     }
 
+    /** Where one query's expected file landed: rank 1..k in the top k (no cutoff), or 0 if it isn't there. */
+    public record QueryRank(String query, String expectedFile, int rank, double score) {
+    }
+
+    public static List<QueryRank> perQuery(List<Ranked> onTopic, int k) {
+        List<QueryRank> out = new ArrayList<>();
+        for (Ranked q : onTopic) {
+            List<Hit> top = q.hits().stream().limit(k).toList();
+            int rank = 0;
+            double score = Double.NaN;
+            for (int i = 0; i < top.size(); i++) {
+                if (top.get(i).sourceFile().equals(q.expectedFile())) {
+                    rank = i + 1;
+                    score = top.get(i).score();
+                    break;
+                }
+            }
+            out.add(new QueryRank(q.query(), q.expectedFile(), rank, score));
+        }
+        return out;
+    }
+
     public record Row(double threshold, double recallAtK, double mrr, double offTopicFalsePositiveRate) {
     }
 
