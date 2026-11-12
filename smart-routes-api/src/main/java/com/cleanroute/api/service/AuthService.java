@@ -8,6 +8,7 @@ import com.cleanroute.api.repository.UserRepository;
 import com.cleanroute.api.util.SecurityHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,10 +29,12 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final JwtTokenProvider tokenProvider;
+    private final ApplicationEventPublisher events;
 
-    public AuthService(UserRepository userRepository, JwtTokenProvider tokenProvider) {
+    public AuthService(UserRepository userRepository, JwtTokenProvider tokenProvider, ApplicationEventPublisher events) {
         this.userRepository = userRepository;
         this.tokenProvider = tokenProvider;
+        this.events = events;
     }
 
     @Transactional
@@ -129,6 +132,7 @@ public class AuthService {
     @Transactional
     public void deleteAccount(UUID userId) {
         userRepository.delete(findUser(userId)); // routes, metrics and notifications cascade in the database
+        events.publishEvent(new AccountDeletedEvent(userId)); // drops in-memory state such as Coach history
         logger.info("Deleted account {}", userId);
     }
 

@@ -18,6 +18,20 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+  # ClearWay builds its AI clients itself (com.cleanroute.api.ai), so a missing key turns the Coach
+  # off with a 503 instead of stopping the app. Spring AI's own model auto-setup is therefore off.
+  autoconfigure:
+    # This one ignores the switches below and insists on a key at start-up.
+    exclude: org.springframework.ai.model.google.genai.autoconfigure.embedding.GoogleGenAiEmbeddingConnectionAutoConfiguration
+  ai:
+    model:
+      chat: none
+      embedding: none
+      embedding.text: none
+      image: none
+      audio.speech: none
+      audio.transcription: none
+      moderation: none
   cache:
     cache-names: aqi
     caffeine:
@@ -49,6 +63,66 @@ alerts:
   poor-threshold: 75        # European AQI above this triggers a POOR_AIR alert
   cooldown-minutes: 120     # at most one alert per route in this window
 
+# ClearWay Coach (AI). Free hosted tiers only; keys come from .env and are never written here.
+# With no key for the chosen provider the Coach answers 503 and the rest of the app runs normally.
+clearway:
+  metrics:
+    # Login for /actuator/info and /actuator/metrics. No defaults: unset means those endpoints are off.
+    user: ${CLEARWAY_METRICS_USER:}
+    password: ${CLEARWAY_METRICS_PASSWORD:}
+  ai:
+    enabled: ${CLEARWAY_AI_ENABLED:true}
+    chat:
+      provider: ${CLEARWAY_AI_CHAT_PROVIDER:gemini}   # gemini (default, same key as embeddings) | groq
+      temperature: 0.2
+      max-output-tokens: 800
+      timeout: 30s                  # one hosted call; a hung model answers 503 after this (timeouts are not retried)
+      # reasoning_effort sent with every Coach call. low = faster and fewer tokens; blank = the model's default.
+      # Gemini 3 Flash: minimal | low | medium | high (thinking can't be fully off). Groq gpt-oss: low | medium | high.
+      reasoning-effort: ${CLEARWAY_AI_REASONING_EFFORT:low}
+    providers:
+      # Both use their OpenAI-compatible endpoints. Model names change; check each provider's docs.
+      gemini:
+        api-key: ${GEMINI_API_KEY:}
+        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
+        # flash-lite: fastest in our Nov 2026 comparison (docs/coach-model-comparison.md), with its own
+        # free quota. gemini-3.5-flash allows only 20 requests a day free; gemini-3.8-flash hung (no reply).
+        chat-model: ${GEMINI_CHAT_MODEL:gemini-3.5-flash-lite}
+      groq:                         # optional
+        api-key: ${GROQ_API_KEY:}
+        base-url: https://api.groq.com/openai/v1
+        chat-model: ${GROQ_CHAT_MODEL:openai/gpt-oss-20b}
+    embedding:                    # always Gemini (one key with chat); its free quota is separate from chat
+      model: gemini-embedding-001
+      dimensions: 768               # V6 creates vector(768); changing this needs a new migration
+      timeout: 20s
+      daily-request-budget: ${CLEARWAY_AI_EMBED_DAILY_REQUESTS:900}   # free limit is 1,000 a day
+    kb:
+      ingest-on-startup: ${CLEARWAY_AI_KB_INGEST_ON_STARTUP:true}
+      top-k: 4
+      similarity-threshold: ${CLEARWAY_AI_KB_SIMILARITY_THRESHOLD:0.6}
+      chunk-size-tokens: 300
+      batch-size: 20                # chunks per embedding request
+      # Ingestion pacing, below gemini-embedding-001's free 100 RPM and 30K TPM (AI Studio, 11 Nov 2026).
+      embed-requests-per-minute: ${CLEARWAY_AI_EMBED_RPM:60}          # batches at least 60s / this apart
+      embed-tokens-per-minute: ${CLEARWAY_AI_EMBED_TPM:25000}         # estimated tokens sent in any minute
+    limits:
+      messages-per-hour: 20         # per user
+      max-input-chars: 2000
+      # Our own daily cap, kept below the provider's free quota. Gemini's free limits are per project
+      # and per model (RPM / TPM / RPD) and reset at midnight Pacific. One Coach message is several requests.
+      # gemini-3.5-flash-lite's free limit is 500 a day per project (AI Studio, 11 Nov 2026), shared
+      # with ./gradlew evalTest: 400 leaves room for one eval run. No daily token limit is listed, so
+      # the token cap is only a safety net. A per-day 429 from the provider also stops all calls.
+      daily-request-budget: ${CLEARWAY_AI_DAILY_REQUESTS:400}
+      daily-token-budget: ${CLEARWAY_AI_DAILY_TOKENS:2000000}
+      budget-reset-zone: ${CLEARWAY_AI_BUDGET_RESET_ZONE:America/Los_Angeles}
+      max-retry-wait: 20s           # a longer Retry-After from the provider means answer 503 straight away
+      # Wall-clock budget for one Coach message, all model calls and tools included. Each model call's
+      # timeout is cut to the time left; when it runs out the Coach answers 503. Keep it below the UI's
+      # Coach timeout (smart-routes-ui/src/lib/api.js, COACH_TIMEOUT_MS).
+      coach-total-timeout: ${CLEARWAY_AI_COACH_TOTAL_TIMEOUT:45s}
+
 security:
   auth-rate-limit:
     per-minute: 10          # login/signup attempts per IP per minute
@@ -65,6 +139,24 @@ resilience4j:
           - com.cleanroute.api.exception.ApiException
           - org.springframework.web.client.HttpClientErrorException
       openMeteo: *cb
+      llm:
+        sliding-window-size: 10
+        minimum-number-of-calls: 4
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+      embedding:
+        sliding-window-size: 10
+        minimum-number-of-calls: 4
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60s
+  bulkhead:
+    instances:
+      llm:
+        max-concurrent-calls: 4     # at most 4 AI calls at once across all users
+        max-wait-duration: 2s
+      embedding:
+        max-concurrent-calls: 4
+        max-wait-duration: 2s
   retry:
     instances:
       tomtom: &retry
@@ -79,10 +171,15 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # Only health is public. info and metrics need CLEARWAY_METRICS_USER / CLEARWAY_METRICS_PASSWORD
+        # (HTTP Basic, see ActuatorSecurityConfig); without them they are switched off.
+        include: health,info,metrics
   endpoint:
     health:
-      show-details: never
+      # Details (database, the "ai" block with lastEmbeddingCall) only for the metrics login;
+      # everyone else gets just UP/DOWN.
+      show-details: when-authorized
+      roles: ACTUATOR
   info:
     env:
       enabled: true

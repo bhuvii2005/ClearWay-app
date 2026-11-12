@@ -1,0 +1,95 @@
+# Live AI evals (./gradlew evalTest): the Coach golden set and the retrieval eval, on the free tier.
+# Run by hand only (Actions > Evals > Run workflow); never on push, because it uses the daily quota
+# that the app shares (about 70 chat requests per run; run it at most once a day).
+#
+# - The provider comes from the "provider" input, else the repository variable CLEARWAY_EVAL_PROVIDER,
+#   else gemini. Keys come only from repository secrets: GEMINI_API_KEY (gemini; the knowledge base
+#   always needs it for embeddings) and GROQ_API_KEY (groq). If a needed secret is missing, the job
+#   skips with a notice instead of failing.
+# - Testcontainers starts a throwaway database for the run. No real database is touched.
+
+name: Evals
+
+on:
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: "Chat provider for the eval (gemini or groq). Empty uses the CLEARWAY_EVAL_PROVIDER variable."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evals
+  cancel-in-progress: false
+
+jobs:
+  evals:
+    name: Coach evals
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: smart-routes-api
+    env:
+      CLEARWAY_EVAL_PROVIDER: ${{ inputs.provider || vars.CLEARWAY_EVAL_PROVIDER || 'gemini' }}
+    steps:
+      - name: Check the API key secrets
+        id: keys
+        working-directory: .
+        env:
+          HAS_GEMINI: ${{ secrets.GEMINI_API_KEY != '' }}
+          HAS_GROQ: ${{ secrets.GROQ_API_KEY != '' }}
+        run: |
+          case "$CLEARWAY_EVAL_PROVIDER" in
+            gemini|groq) ;;
+            *) echo "::error::CLEARWAY_EVAL_PROVIDER must be gemini or groq, got '$CLEARWAY_EVAL_PROVIDER'"; exit 1 ;;
+          esac
+          missing=""
+          [ "$HAS_GEMINI" = "true" ] || missing="GEMINI_API_KEY"
+          if [ "$CLEARWAY_EVAL_PROVIDER" = "groq" ] && [ "$HAS_GROQ" != "true" ]; then
+            missing="${missing:+$missing and }GROQ_API_KEY"
+          fi
+          if [ -n "$missing" ]; then
+            echo "::notice title=Evals skipped::The $missing repository secret is not set, so the $CLEARWAY_EVAL_PROVIDER evals were skipped. Add it under Settings > Secrets and variables > Actions."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.keys.outputs.run == 'true'
+      - uses: actions/setup-java@v4
+        if: steps.keys.outputs.run == 'true'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.keys.outputs.run == 'true'
+
+      - name: Run evalTest
+        if: steps.keys.outputs.run == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: ./gradlew --no-daemon evalTest
+
+      - name: Add the summary to the job page
+        if: always() && steps.keys.outputs.run == 'true'
+        run: |
+          if [ -f build/reports/evals/summary.md ]; then
+            cat build/reports/evals/summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No eval summary was written." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload summary.md
+        if: always() && steps.keys.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-summary
+          path: smart-routes-api/build/reports/evals/summary.md
+          if-no-files-found: warn
+          retention-days: 30

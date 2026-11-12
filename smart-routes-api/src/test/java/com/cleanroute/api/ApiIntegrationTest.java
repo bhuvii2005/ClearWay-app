@@ -1,5 +1,6 @@
 package com.cleanroute.api;
 
+import com.cleanroute.api.support.TestDatabase;
 import com.cleanroute.api.dto.PollutionData;
 import com.cleanroute.api.dto.TomTomRouteResponse;
 import com.cleanroute.api.service.integration.OpenMeteoAqiClient;
@@ -12,12 +13,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,11 +47,13 @@ class ApiIntegrationTest {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer postgis = new PostgreSQLContainer(
-            DockerImageName.parse("postgis/postgis:15-3.4").asCompatibleSubstituteFor("postgres"));
+    static PostgreSQLContainer postgis = TestDatabase.newContainer();
 
     @Autowired
     MockMvc mvc;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @MockitoBean
     TomTomRoutingClient tomTom;
@@ -72,6 +75,14 @@ class ApiIntegrationTest {
     }
 
     // ------------------------------------------------------------------ tests
+
+    @Test
+    void databaseImage_OffersPgvector() {
+        // The test database is built from db/Dockerfile, like production, so pgvector must be installable.
+        Integer available = jdbc.queryForObject(
+                "SELECT count(*) FROM pg_available_extensions WHERE name = 'vector'", Integer.class);
+        org.assertj.core.api.Assertions.assertThat(available).isEqualTo(1);
+    }
 
     @Test
     void publicEndpoints_AndAuthErrors() throws Exception {

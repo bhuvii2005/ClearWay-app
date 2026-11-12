@@ -125,6 +125,16 @@ await page.getByRole('heading', { name: 'Alerts', exact: true }).waitFor();
 await page.waitForTimeout(1500);
 await shot('08-alerts');
 
+// Only checks the page loads with its empty state: no question is sent, so no AI quota is used.
+step('coach page');
+await page.goto(BASE + '/coach');
+await page.getByRole('heading', { name: 'Coach', exact: true }).waitFor();
+await page.getByRole('heading', { name: 'Ask the Coach' }).waitFor();
+if ((await page.getByRole('list', { name: 'Suggested questions' }).getByRole('button').count()) !== 3) {
+  problems.push('coach page should show 3 suggested questions');
+}
+await shot('08b-coach-empty');
+
 step('account');
 await page.goto(BASE + '/account');
 await page.getByRole('heading', { name: 'Account', exact: true }).waitFor();

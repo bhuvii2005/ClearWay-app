@@ -16,8 +16,9 @@ import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWrite
 import java.io.IOException;
 
 /**
- * Stateless JWT security. Public: signup, login, health check, API docs and the
- * WebSocket handshake (WebSocket clients authenticate on the STOMP CONNECT frame instead).
+ * Stateless JWT security. Public: signup, login, API docs and the WebSocket handshake
+ * (WebSocket clients authenticate on the STOMP CONNECT frame instead). {@code /actuator/**} has its
+ * own chain, {@link ActuatorSecurityConfig}, checked before this one.
  */
 @Configuration
 @EnableWebSecurity
@@ -42,7 +43,6 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/signup", "/api/v1/auth/login").permitAll()
-                .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/ws/**").permitAll()
                 .requestMatchers("/error").permitAll()

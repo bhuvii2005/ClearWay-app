@@ -109,6 +109,14 @@ export default function RouteDetailPage() {
             {modeLabel(route.type)} · {formatDistanceKm(route.distanceKm)}
             {route.travelTimeSeconds ? ` · ${formatDuration(route.travelTimeSeconds)}` : ''} · checked {formatRelative(route.lastCheckedAt)}
           </p>
+          <Link
+            to="/coach"
+            state={{ prefill: `When is the best time to travel my "${route.name}" route, and how has its air been this week?` }}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-accent-ink underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-accent"
+          >
+            <Icon name="chat" className="h-4 w-4" />
+            Ask Coach about this route
+          </Link>
         </div>
         <div className="w-full rounded-2xl bg-surface px-4 py-2 shadow-card ring-1 ring-hairline sm:w-80">
           <Toggle

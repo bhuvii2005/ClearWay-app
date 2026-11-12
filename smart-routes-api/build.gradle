@@ -18,6 +18,17 @@ repositories {
 	mavenCentral()
 }
 
+// Spring AI versions are managed in one place by its BOM; never pin single Spring AI artifacts.
+ext {
+	springAiVersion = '2.0.2'
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+	}
+}
+
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
@@ -32,6 +43,11 @@ dependencies {
 	implementation 'com.github.ben-manes.caffeine:caffeine'
 	implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
 	implementation 'org.flywaydb:flyway-database-postgresql'
+	// AI: Gemini chat (default) or Groq through the OpenAI-compatible module, Gemini for embeddings (versions from the Spring AI BOM)
+	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+	implementation 'org.springframework.ai:spring-ai-starter-model-google-genai-embedding'
+	// Knowledge base: the plain PgVectorStore module (no auto-config; ClearWay builds the store itself)
+	implementation 'org.springframework.ai:spring-ai-pgvector-store'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
@@ -48,6 +64,22 @@ dependencies {
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+// Normal builds never talk to a real AI model: anything tagged "eval" is left out here.
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'eval'
+	}
+}
+
+// Live checks against Groq/Gemini free tiers. Run on purpose: ./gradlew evalTest
+// Tests skip themselves when the keys are missing.
+tasks.register('evalTest', Test) {
+	description = 'Runs live AI checks (tag "eval") against the hosted free tiers.'
+	group = 'verification'
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+	useJUnitPlatform {
+		includeTags 'eval'
+	}
+	outputs.upToDateWhen { false }
 }
