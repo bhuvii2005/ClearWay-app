@@ -110,8 +110,7 @@ clearway:
       messages-per-hour: 20         # per user
       max-input-chars: 2000
       # Our own daily cap, kept below the provider's free quota. Gemini's free limits are per project
-      # and per model (RPM / TPM / RPD) and reset at midnight Pacific. Placeholders until the real
-      # numbers from the AI Studio console are filled in; one Coach message is several requests.
+      # and per model (RPM / TPM / RPD) and reset at midnight Pacific. One Coach message is several requests.
       # gemini-3.5-flash-lite's free limit is 500 a day per project (AI Studio, 11 Nov 2026), shared
       # with ./gradlew evalTest: 400 leaves room for one eval run. No daily token limit is listed, so
       # the token cap is only a safety net. A per-day 429 from the provider also stops all calls.

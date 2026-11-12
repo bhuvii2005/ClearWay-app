@@ -1,6 +1,6 @@
 # ClearWay AI features: handoff
 
-How far the AI work on `feature/ai-coach` has got, so a fresh session (or person) can pick it up. Last updated **12 Nov 2026, 08:45 IST**. Keep it current: update it at the end of every work session.
+How far the AI work on `feature/ai-coach` has got, so a fresh session (or person) can pick it up. Last updated **12 Nov 2026, 12:10 IST**. Keep it current: update it at the end of every work session.
 
 The full task list is in `ClearWay — AI Features Implementation Prompt (Coach + RAG + Evals).md` at the repo root. It's untracked on purpose, so don't commit it.
 
@@ -12,11 +12,11 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
 | 1 | Provider layer for free-tier LLMs (Gemini by default, Groq optional), budgets, circuit breaker | done |
 | 2 | Knowledge base: Gemini embeddings, pgvector (migration V6), search with a threshold | done |
 | 3 | Coach: `POST /api/v1/coach/chat` with read-only tools, server-side identity | done |
-| 4 | Evals (20-case golden set, retrieval eval), Micrometer metrics, per-message log | done; golden set rerun is due |
+| 4 | Evals (20-case golden set, retrieval eval), Micrometer metrics, per-message log | done; baseline 19/20 (12 Nov) |
 | 5 | Coach page in the UI (`/coach`) | done |
-| D | Wrap-up: README Coach section, technical doc, secret scan, full Docker test run, PR | **next** |
+| D | Wrap-up: README Coach section, technical doc, secret scan, full Docker test run, PR | done; PR open, **not merged** |
 
-The branch is pushed up to `261ab2f` (health detail, IPv6 README note, screenshots, this file). Check `git log origin/feature/ai-coach..HEAD` for anything committed but not yet pushed.
+The branch is pushed and the PR is open (see the PR link in the latest commit or on GitHub). Check `git log origin/feature/ai-coach..HEAD` for anything committed but not yet pushed.
 
 ## Commits on the branch (oldest first)
 
@@ -37,6 +37,8 @@ The branch is pushed up to `261ab2f` (health detail, IPv6 README note, screensho
 | `b0b8dc4` | Docker: the API runs on IPv4 (fixes failing knowledge-base search in the container) |
 | `23b1dbf` | Phase 5: Coach page |
 | `261ab2f` | `lastEmbeddingCall` in health; health details only for the actuator login; IPv6 note, screenshots, this file |
+| `51e66cf` | Handoff update (metrics login, machine-changes rule) |
+| wrap-up | README Coach section, technical doc section 15 and ADR-33 to ADR-38, 12 Nov baseline, `.env.example` additions |
 
 ## Config and limits
 
@@ -62,48 +64,42 @@ The branch is pushed up to `261ab2f` (health detail, IPv6 README note, screensho
 
 ## Eval results so far
 
-- **Golden set:** one full run (11 Nov 2026, 08:41 IST) passed **18 of 20** cases.
-  - Tool selection 7/8, grounding 4/4, knowledge base 4/4, safety 3/4.
-  - It used 48 requests and 64,390 tokens, at 9.8 s average per message.
-  - Both failures were wording checks rejecting correct answers. Those two cases (`tool-no-history`, `safety-other-users-route`) now use behaviour checks, which haven't had a live run yet.
-  - Report: [docs/evals/baseline.md](evals/baseline.md).
-- **Retrieval (15 queries, 11 Nov, 19:58 IST):**
-  - recall@4 100% at 0.50–0.60 and 93% at 0.65; MRR 0.97 at 0.60; 0% off-topic false positives.
-  - The lowest expected-file score was 0.643; the best off-topic score was 0.484.
-- **Targets:** tool selection ≥85%, grounding ≥90%, KB citations ≥90%, safety 100%, recall@4 ≥80%. Report the real numbers; never weaken a test to pass.
+| Run | Golden set | Tools | Grounding | KB | Safety | Requests / tokens |
+|---|---|---|---|---|---|---|
+| 12 Nov 2026, 11:22 IST ([baseline](evals/baseline.md)) | 19/20 | 7/8 | 4/4 | 4/4 | 4/4 | 46 / 61,178 |
+| 11 Nov 2026, 08:41 IST ([first run](evals/2026-11-11-first-run.md)) | 18/20 | 7/8 | 4/4 | 4/4 | 3/4 | 48 / 64,390 |
 
-## Tests (last full runs)
+- Every failure so far was a wording regex rejecting a correct answer. On 12 Nov that was `tool-single-reading` ("only data for 10:00 AM… don't have enough data"). Converting it to the `no_usable_history` behaviour check is proposed but **not done**: the user decides, because changing a check right after it fails looks like weakening it.
+- Retrieval (15 queries): recall@4 100% at 0.60 and 93% at 0.65; MRR 0.97; 0% off-topic false positives. The threshold stays at 0.60.
+- The next golden run is due no sooner than the next quota day (after 1:30 PM IST). It shares the 500/day quota with the app.
 
-- **Backend:** `./gradlew build` passes 149 tests with no model calls. It needs Docker running for Testcontainers.
-- **UI:** `npx vitest run` passes 47 tests, and `npx eslint .` is clean.
-- **e2e:** `npm run e2e` passed on 11 Nov. It needs the API, the dev server and TomTom. TomTom/DNS timeouts sometimes fail it; that's external.
+## Tests (last full runs, 12 Nov 2026, freshly rebuilt Docker stack)
+
+- **Backend:** `./gradlew build` passed 149 tests, with no model calls.
+- **UI:** 47 Vitest tests pass; lint and build are clean.
+- **e2e:** `E2E_BASE_URL=http://localhost:4173 npm run e2e` passed against the Docker web app.
+- **Docker AI check:** a real knowledge-base question came back with 3 sources.
+  - `kb.search{result=error}` was 0 (never recorded); both searches were hits.
+  - `gen_ai.client.operation` and `gen_ai.client.token.usage` are present.
+  - With the actuator login, health shows `lastEmbeddingCall: ok`; without it, health shows only UP.
 
 ## Open items and risks
 
-1. **Golden set rerun:** due 12 Nov after 1:30 PM IST. Run it with `./gradlew evalTest --tests '*CoachGoldenEvalTest'`. Update `docs/evals/baseline.md` only if the harness is final, and keep the honest 18/20 history.
-2. **Quota pre-flight check:** it now works (the login was checked at 08:45 IST on 12 Nov). It reads the app's own counter, which resets when the API restarts, so it can undercount Google's real daily use. Yesterday's run and checks used about 75 of 500 flash-lite requests before the 1:30 PM IST reset.
-3. **Metrics in Docker:** check, on a freshly rebuilt stack, that Spring AI's `gen_ai.client.*` metrics appear and that `kb.search{result=error}` is 0 after a real knowledge-base question. The API container currently runs the image built on 11 Nov, so health details (`lastEmbeddingCall`) only appear after the wrap-up rebuild.
-4. **Known limits (for the README Coach section):**
+1. **PR open, not merged.** The user reviews and merges.
+2. **`tool-single-reading` wording check:** proposed conversion to a behaviour check (see above), waiting for the user.
+3. **Shared quota:** the app and the evals share 500 chat requests a day, and the app's counter resets on restart, so the pre-flight check can undercount Google's real use.
+4. **Known limits:**
    - conversation memory is in-memory only
    - budgets reset when the API restarts
    - air data is modelled on a 10–40 km grid
-   - the app and evals share one quota
-5. **Smoke test:** the TomTom/Photon/Open-Meteo flakiness is external and documented; don't change the smoke test for it.
+   - one API replica is assumed
+5. **External flakiness:** TomTom, Photon and Open-Meteo sometimes fail the e2e smoke test; this is documented, so rerun it before suspecting the app. A Docker web build once failed with a truncated base-image download, and a retry fixed it.
 
 ## Remaining steps
 
-1. Run the golden set once (after 1:30 PM IST on 12 Nov) and report the numbers.
-2. **Wrap-up D:**
-   - **README:** a Coach section covering what it does, architecture, the limits table, a link to `docs/coach-model-comparison.md`, the eval baseline and known limitations.
-   - **Technical reference doc** (Claude Doc `https://claude.ai/artifact/Df3voaKiXS6J8zuHcrN8QY`):
-     - new endpoints
-     - V6
-     - all new config properties
-     - ADRs: Spring AI 2.0, Gemini free tier by default with Groq optional, pgvector in the same Postgres, read-only tools with server-side identity, deterministic evals, per-message time budget
-   - **`.env.example`:** placeholders only, plus a secret scan of every new commit.
-   - **Full Docker run:** rebuild the stack, run backend, UI and e2e tests, then the metrics check (open item 3).
-   - **PR `feature/ai-coach` → `main`:** summary, eval numbers, the model comparison table, screenshots from `docs/screenshots/`. **Don't merge.**
-3. **Stop and report** the PR link and the risks.
+1. The user reviews the PR. Merge only when the user says so; never merge on your own.
+2. If the user agrees, convert `tool-single-reading` to the behaviour check. Then run the golden set once on the next quota day, and update `docs/evals/baseline.md` only if all harness changes are final.
+3. Keep this file current after every session.
 
 ## Working rules (from the user)
 
