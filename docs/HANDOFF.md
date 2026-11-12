@@ -93,7 +93,7 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
 ## Open items and risks
 
 1. **Issue [#2](https://github.com/bhuvii2005/ClearWay-app/issues/2), not implemented:** the Coach shouldn't call a single reading the "best time". Possible fix: a must-not-recommend eval check plus a system-prompt rule, maybe `bestHour`/`worstHour` = null when too few hours.
-2. **Eval report answers:** done on `docs/eval-2026-11-12`; every case's answer and tools are saved. The next live run is the first to use it; check `tool-single-reading` there for issue #2.
+2. **Eval report answers:** done and merged (PR [#4](https://github.com/bhuvii2005/ClearWay-app/pull/4)); every case's answer and tools are saved. The next live run is the first to use it; check `tool-single-reading` there for issue #2.
 3. **Shared quota:** the app and the evals share 500 chat requests a day, and the app's counter resets on restart, so the pre-flight check can undercount Google's real use.
 4. **Known limits:**
    - conversation memory is in-memory only
@@ -102,10 +102,35 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
    - one API replica is assumed
 5. **External flakiness:** TomTom, Photon and Open-Meteo sometimes fail the e2e smoke test; this is documented, so rerun it before suspecting the app. Issue [#3](https://github.com/bhuvii2005/ClearWay-app/issues/3) proposes mocking them in the default smoke run and keeping one optional live run (not implemented). A Docker web build once failed with a truncated base-image download, and a retry fixed it.
 
+## Follow-up in progress: Coach voice input (12 Nov 2026)
+
+Branch `feature/coach-voice-input`, rebased onto `main` after PR #4 merged (13 Nov), as one commit. It's frontend only: no backend change, no new npm dependencies and no Gemini quota.
+
+**Code:**
+- `smart-routes-ui/src/hooks/useSpeechRecognition.js`: Web Speech API (`SpeechRecognition` or `webkitSpeechRecognition`).
+  - Settings: `continuous` false, interim results on, 1 alternative.
+  - Language: `FALLBACK_SPEECH_LANG` (`en-IN`) unless the browser language is English.
+  - Stops by itself after 30 s, gives up 2 s after a `stop()` that never ends, and aborts when the tab is hidden and on unmount (handlers detached, no state updates afterwards).
+  - Unsupported outside a secure context.
+- `CoachPage.jsx`: a mic button next to Send, hidden when unsupported, and disabled while the Coach is thinking.
+  - The final text is appended to the box (`appendTranscript` in `lib/coach.js`), cut at 2,000 characters with a counter warning, and **never sent automatically**.
+  - Send and New chat abort listening.
+  - Interim words show in grey under the box, not inline. A textarea can't style part of its text.
+  - Errors map to friendly text (`speechErrorMessage`); `aborted` shows nothing.
+
+**Checks:**
+- Tests: 73 UI tests (47 before, plus 19 page tests with a fake recognizer and 7 helper tests); lint and build clean. The language test stubs `navigator.language`: it first passed only because this machine reports `en-IN`, the fallback, and CI (`en-US`) caught it.
+- Coach page load check in real headless Chrome on the dev server: loads, mic shown, no errors, no Coach requests.
+- The full smoke test failed twice on 12 Nov at its planner steps (TomTom compare, then Photon place search), before the Coach step: external flakiness.
+- Screenshot: `docs/screenshots/coach-voice-listening.png`, made with a fake recognizer, because headless Chrome has no speech service. In real headless Chrome, clicking the mic shows the "Microphone access is blocked" error, as designed.
+- **Not yet done:** the user's manual device check (Chrome, Edge, Android Chrome, iOS Safari, Firefox, permission denied, Indian-English accent).
+
+**State:** pushed with an open PR to `main`, waiting for the user's review and merge. After the rebase: 73 UI tests, lint and build clean.
+
 ## Remaining steps
 
 1. The AI feature is shipped; nothing is pending for it apart from issue #2. Merge anything only when the user says so (the user merges with a merge commit, not squash).
-2. Follow-ups get their own branch and PR. The next one is Coach voice input (`feature/coach-voice-input`, frontend only).
+2. Follow-ups get their own branch and PR. Coach voice input is on `feature/coach-voice-input` (above), waiting for review.
 3. Keep this file current after every session.
 
 ## Working rules (from the user)

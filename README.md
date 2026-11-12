@@ -95,6 +95,16 @@ The Coach is a chat assistant, under the **Coach** tab (`/coach`) for signed-in 
 
 The empty page, with its three suggested questions: [docs/screenshots/coach-empty.png](docs/screenshots/coach-empty.png).
 
+**Voice input.** A microphone button next to **Send** lets you speak a question instead of typing it.
+- **It never sends by itself.** The words go into the box, added after anything already typed, and you check them and press **Send**, so a wrong transcript costs no AI quota.
+- **While listening:** the words heard so far show in grey, and listening stops after 30 seconds. It also stops when you click again, send, start a new chat, leave the page or switch tabs.
+- **Browsers:** it uses the browser's own Web Speech API, so there's no backend change and no extra cost. It works in Chrome, Edge and Safari. Firefox has no speech recognition, so the button is hidden there.
+- **HTTPS required:** browsers allow speech recognition only on HTTPS or `localhost`. On plain `http://` from another machine, such as a phone on your LAN, the button is hidden.
+- **Privacy:** voice uses your browser's speech service. In Chrome, audio is sent to Google to transcribe; ClearWay itself never receives audio.
+- **Language:** recognition uses your browser's language if it's English, and Indian English (`en-IN`) otherwise (`FALLBACK_SPEECH_LANG` in [`useSpeechRecognition.js`](smart-routes-ui/src/hooks/useSpeechRecognition.js)).
+
+![Coach listening: the typed text, then the words heard so far in grey, and the privacy note](docs/screenshots/coach-voice-listening.png)
+
 ### Architecture
 
 ```
@@ -226,7 +236,7 @@ Fixed on 11 Nov 2026.
 |---|---|
 | `cd smart-routes-api && ./gradlew test` | 149 tests: services, security, the AI gateway, limits, knowledge base and Coach (scripted models and a fake provider on localhost, no internet), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
 | `cd smart-routes-api && ./gradlew evalTest` | Live AI checks (see **Evals** above): the 20-case Coach golden set, the retrieval eval, and a few quick live checks of the gateway, the knowledge base and the Coach. They need `GEMINI_API_KEY`, use at most 70 chat requests a run at 12 a minute, and write `build/reports/evals/summary.md`. Run them at most once a day, because the app shares the quota. Never part of `build` |
-| `cd smart-routes-ui && npm test` | Air-quality bands, wording, the API client and its error messages, and the Coach page (sending, waiting, answers with sources, every error type) |
+| `cd smart-routes-ui && npm test` | Air-quality bands, wording, the API client and its error messages, the Coach page (sending, waiting, answers with sources, every error type) and its voice input (with a fake speech recognizer) |
 | `cd smart-routes-ui && npm run lint` | Code style and React rules |
 | `cd smart-routes-ui && npm run e2e` | Full browser journey against a running app (set `E2E_BASE_URL=http://localhost:4173` for the Docker version). It uses the real outside services (Photon place search, TomTom, Open-Meteo), so it sometimes fails at those steps when one is slow or briefly unreachable; run it again before suspecting the app |
 
