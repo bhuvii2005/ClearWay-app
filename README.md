@@ -77,9 +77,17 @@ Once a cap is reached, the Coach answers 503 until midnight Pacific.
 
 **ClearWay Coach.** `POST /api/v1/coach/chat` answers questions about your saved routes and the air. It can call five read-only tools: list your routes, a route's history (with its cleanest and most polluted hours), current air quality at a point, your pollutant sensitivities, and a knowledge-base search. Tools get your identity from your login, never from the model, so the Coach can't see anyone else's routes. Every number in an answer has to come from a tool, and sources are listed only when the knowledge-base search actually returned them. A message can use at most 5 tool calls. The Coach remembers the last 10 messages of each conversation in memory only, so history is lost when the API restarts, and it's cleared when you delete your account.
 
+**Coach page.** Signed-in users get a **Coach** tab (`/coach`) for chatting with the Coach. It shows which tools were used and links to the sources. Answers are plain text, and every error keeps your typed question. A route's page also has an "Ask Coach about this route" link, which fills in a question without sending it.
+
+| Answer with sources | Dark theme | Mobile (error state) |
+|---|---|---|
+| ![Coach answer with three knowledge-base sources](docs/screenshots/coach-answer-sources.png) | ![Coach answer in the dark theme](docs/screenshots/coach-answer-dark.png) | ![Coach on a phone, showing a "took too long" error](docs/screenshots/coach-mobile.png) |
+
+The empty page, with its three suggested questions: [docs/screenshots/coach-empty.png](docs/screenshots/coach-empty.png).
+
 **Coach speed and timeouts.** Each Coach call asks the model for low reasoning effort (`CLEARWAY_AI_REASONING_EFFORT`, default `low`; leave it blank for the model's own default), which uses fewer tokens. One message also has a total time budget, `CLEARWAY_AI_COACH_TOTAL_TIMEOUT` (default 45 s). Each model call's 30-second timeout is cut to whatever is left, and once the budget runs out no further model call or tool is started and the Coach answers 503, so a slow model can't keep a message open for 5 × 30 seconds. A tool that's already running when time runs out finishes first, which adds at most 20 seconds and usually about 1. The browser's Coach timeout (`COACH_TIMEOUT_MS` in `smart-routes-ui/src/lib/api.js`, 75 s) is set above that. Nothing else in between has a shorter limit: the UI calls the API directly (nginx only serves the built UI files), and the Coach endpoint runs synchronously, so Spring's async request timeout doesn't apply. If you raise the budget, raise `COACH_TIMEOUT_MS` too.
 
-**Actuator.** `/actuator/health` is public; Docker's health check uses it. `/actuator/metrics` and `/actuator/info` need HTTP Basic with `CLEARWAY_METRICS_USER` and `CLEARWAY_METRICS_PASSWORD` from `.env` (password at least 12 characters). There are no default credentials: if they aren't set, those endpoints are switched off. They have their own security chain, so an app user's login token doesn't open them. Example: `curl -u "$CLEARWAY_METRICS_USER:$CLEARWAY_METRICS_PASSWORD" http://localhost:8090/actuator/metrics`.
+**Actuator.** `/actuator/health` is public; Docker's health check uses it. Anonymous callers get only UP or DOWN; with the actuator login it also shows details, including the `ai` block (provider, model, whether the knowledge base is available, and `lastEmbeddingCall`). The health check never calls Google and never reports DOWN because of AI. `/actuator/metrics` and `/actuator/info` need HTTP Basic with `CLEARWAY_METRICS_USER` and `CLEARWAY_METRICS_PASSWORD` from `.env` (password at least 12 characters). There are no default credentials: if they aren't set, those endpoints are switched off. They have their own security chain, so an app user's login token doesn't open them. Example: `curl -u "$CLEARWAY_METRICS_USER:$CLEARWAY_METRICS_PASSWORD" http://localhost:8090/actuator/metrics`.
 
 **Coach metrics and logs.** These are under `/actuator/metrics`, behind the actuator login.
 - **Spring AI's own model metrics:**
@@ -120,6 +128,12 @@ On GitHub, the **Evals** workflow (run it by hand from the Actions tab) does the
 
 **Coach knowledge base.** Five short guidance files in [`smart-routes-api/src/main/resources/kb/`](smart-routes-api/src/main/resources/kb/) (WHO guideline levels, European AQI bands, health effects, exercising in poor air, how ClearWay scores routes) are embedded with Gemini and stored in the `vector_store` table (migration V6, pgvector). This happens in the background at start-up, and only for files that are new or changed, so a normal restart uses no embedding requests. Each file is stored all-or-nothing: if Gemini answers 429 partway through, that file is left as it was and is retried on the next start-up. Without `GEMINI_API_KEY` the knowledge base is simply off.
 
+**Bug found: IPv6 in Docker (fixed 11 Nov 2026).**
+- **Symptom:** in the Docker stack, every Coach knowledge-base search failed after exactly 20 seconds, so answers came back without sources. Chat calls worked, and the log showed `AI embedding call failed (status network/timeout, GenAiIOException)`.
+- **Cause:** Google's API hosts have IPv6 addresses, but Docker's default network has no IPv6 route. The Gemini embedding client waited on an IPv6 connection until its 20-second timeout instead of moving on to IPv4. The chat client (a different HTTP library) wasn't affected. `wget` from inside the container got an answer in 3 seconds.
+- **Fix:** the API image runs Java with `-Djava.net.preferIPv4Stack=true`. Its health check now calls `127.0.0.1` instead of `localhost`, because `localhost` can resolve to IPv6 (`::1`), where Java no longer listens.
+- **Why tests didn't catch it:** the unit and integration tests mock the provider or use a fake one on localhost. The live evals run on the host, which has working IPv6 (or falls back properly), not inside the container. Only a real question to the Docker stack showed it. The `ai` health details now include `lastEmbeddingCall` (ok or failed, with the time) so this kind of failure is visible without calling Google.
+
 ### 2a. Run everything with Docker (easiest)
 
 Needs only Docker Desktop.
@@ -155,7 +169,7 @@ The API reads the root `.env` automatically. On Windows, if Java 17 is not the d
 
 | Command | What it checks |
 |---|---|
-| `cd smart-routes-api && ./gradlew test` | 147 tests: services, security, the AI gateway, limits, knowledge base and Coach (scripted models and a fake provider on localhost, no internet), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
+| `cd smart-routes-api && ./gradlew test` | 149 tests: services, security, the AI gateway, limits, knowledge base and Coach (scripted models and a fake provider on localhost, no internet), and full API + WebSocket flows against a throwaway database built from `db/Dockerfile` (needs Docker running) |
 | `cd smart-routes-api && ./gradlew evalTest` | Live AI checks (see **Evals** above): the 20-case Coach golden set, the retrieval eval, and a few quick live checks of the gateway, the knowledge base and the Coach. They need `GEMINI_API_KEY`, use at most 70 chat requests a run at 12 a minute, and write `build/reports/evals/summary.md`. Run them at most once a day, because the app shares the quota. Never part of `build` |
 | `cd smart-routes-ui && npm test` | Air-quality bands, wording, and the API client |
 | `cd smart-routes-ui && npm run lint` | Code style and React rules |

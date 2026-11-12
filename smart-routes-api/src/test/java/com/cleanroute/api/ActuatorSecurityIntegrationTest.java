@@ -73,6 +73,16 @@ class ActuatorSecurityIntegrationTest {
         }
 
         @Test
+        void healthDetails_OnlyForTheLogin() throws Exception {
+            mvc.perform(get("/actuator/health")).andExpect(jsonPath("$.components").doesNotExist());
+            mvc.perform(get("/actuator/health").header(HttpHeaders.AUTHORIZATION, basic(USER, PASSWORD)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.components.ai.status").value("UP"))
+                    // AI is off in tests, so no embedding call has been made.
+                    .andExpect(jsonPath("$.components.ai.details.lastEmbeddingCall").value("none yet"));
+        }
+
+        @Test
         void metrics_WithoutLogin_Is401WithBasicChallenge() throws Exception {
             mvc.perform(get("/actuator/metrics"))
                     .andExpect(status().isUnauthorized())

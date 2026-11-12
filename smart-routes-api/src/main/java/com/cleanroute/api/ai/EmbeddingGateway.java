@@ -21,16 +21,29 @@ public final class EmbeddingGateway implements EmbeddingModel {
     private final EmbeddingModel delegate;
     private final ProviderGuard guard;
     private final int dimensions;
+    private final EmbeddingCallStatus status;
 
     EmbeddingGateway(EmbeddingModel delegate, ProviderGuard guard, int dimensions) {
+        this(delegate, guard, dimensions, new EmbeddingCallStatus(java.time.Clock.systemUTC()));
+    }
+
+    EmbeddingGateway(EmbeddingModel delegate, ProviderGuard guard, int dimensions, EmbeddingCallStatus status) {
         this.delegate = delegate;
         this.guard = guard;
         this.dimensions = dimensions;
+        this.status = status;
     }
 
     @Override
     public EmbeddingResponse call(EmbeddingRequest request) {
-        return guard.call(() -> delegate.call(request), AiUsageTally::recordEmbeddingRequest);
+        try {
+            EmbeddingResponse response = guard.call(() -> delegate.call(request), AiUsageTally::recordEmbeddingRequest);
+            status.ok();
+            return response;
+        } catch (RuntimeException e) {
+            status.failed(e);
+            throw e;
+        }
     }
 
     @Override

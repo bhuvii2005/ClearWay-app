@@ -177,7 +177,10 @@ management:
         include: health,info,metrics
   endpoint:
     health:
-      show-details: never
+      # Details (database, the "ai" block with lastEmbeddingCall) only for the metrics login;
+      # everyone else gets just UP/DOWN.
+      show-details: when-authorized
+      roles: ACTUATOR
   info:
     env:
       enabled: true

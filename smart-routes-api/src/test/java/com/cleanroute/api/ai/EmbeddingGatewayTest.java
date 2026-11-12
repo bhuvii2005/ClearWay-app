@@ -78,6 +78,31 @@ class EmbeddingGatewayTest {
     }
 
     @Test
+    void health_ShowsTheLastEmbeddingCall_WithoutCallingIt_AndStaysUp() {
+        // Call 1 succeeds; calls 2 and 3 are 429s (one retry), so call 2 ends in a 503.
+        FakeEmbeddingModel model = new FakeEmbeddingModel(n -> n >= 2 ? tooManyRequests() : null);
+        EmbeddingService service = service(model);
+        LlmGateway noChat = new LlmGateway(Optional.empty(), new HostedAiBudget(10, 10_000, java.time.Clock.systemUTC()),
+                CircuitBreaker.ofDefaults("llm"), Bulkhead.ofDefaults("llm"), Duration.ofSeconds(20), waits::add);
+        AiHealthIndicator health = new AiHealthIndicator(noChat, service);
+
+        assertThat(health.health().getDetails()).containsEntry("lastEmbeddingCall", "none yet");
+        assertThat(model.requests).hasValue(0); // health made no call
+
+        service.forQueries().orElseThrow().embed("q");
+        assertThat(health.health().getDetails().get("lastEmbeddingCall"))
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP).containsEntry("result", "ok").containsKey("at");
+
+        assertThatThrownBy(() -> service.forQueries().orElseThrow().embed("q")).isInstanceOf(ApiException.class);
+        var details = health.health();
+        assertThat(details.getStatus().getCode()).isEqualTo("UP");
+        assertThat(details.getDetails().get("lastEmbeddingCall"))
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("result", "failed").containsEntry("reason", "provider_error").containsKey("at");
+        assertThat(model.requests).hasValue(3);
+    }
+
+    @Test
     void chunkTitleIsEmbeddedWithTheText() {
         EmbeddingGateway gateway = service(new FakeEmbeddingModel()).forDocuments().orElseThrow();
         Document chunk = new Document("PM2.5 guideline is 15.", Map.of(KnowledgeBaseMetadata.TITLE, "WHO guidelines"));

@@ -39,6 +39,7 @@ public class EmbeddingService {
     private final ProviderGuard guard;
     private final Optional<EmbeddingGateway> forDocuments;
     private final Optional<EmbeddingGateway> forQueries;
+    private final EmbeddingCallStatus lastCall = new EmbeddingCallStatus(Clock.systemUTC());
 
     @Autowired
     public EmbeddingService(AiProperties properties, CircuitBreakerRegistry circuitBreakers, BulkheadRegistry bulkheads) {
@@ -54,8 +55,8 @@ public class EmbeddingService {
                 Clock.system(properties.limits().budgetResetZone()));
         this.guard = new ProviderGuard("embedding", budget, circuitBreaker, bulkhead,
                 properties.limits().maxRetryWait(), sleeper);
-        this.forDocuments = documentModel.map(m -> new EmbeddingGateway(m, guard, dimensions));
-        this.forQueries = queryModel.map(m -> new EmbeddingGateway(m, guard, dimensions));
+        this.forDocuments = documentModel.map(m -> new EmbeddingGateway(m, guard, dimensions, lastCall));
+        this.forQueries = queryModel.map(m -> new EmbeddingGateway(m, guard, dimensions, lastCall));
     }
 
     public boolean isConfigured() {
@@ -83,6 +84,11 @@ public class EmbeddingService {
 
     public HostedAiBudget budget() {
         return guard.budget();
+    }
+
+    /** The most recent embedding call's result (ingestion or search); empty until the first call. */
+    public Optional<EmbeddingCallStatus.LastCall> lastCall() {
+        return lastCall.last();
     }
 
     public CircuitBreaker.State circuitState() {

@@ -5,6 +5,8 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 /**
  * Shows the Coach's AI set-up under {@code /actuator/health} ("ai"). Always UP: the app works
  * without AI, so a missing key or an open circuit is reported as a detail, never as DOWN.
@@ -32,6 +34,12 @@ public class AiHealthIndicator implements HealthIndicator {
         }
         health.withDetail("knowledgeBaseAvailable", embeddings.isConfigured()
                 && embeddings.circuitState() != CircuitBreaker.State.OPEN);
+        // From memory only: health never calls Google. A failed call is a detail, not DOWN.
+        health.withDetail("lastEmbeddingCall", embeddings.lastCall()
+                .<Object>map(c -> c.ok()
+                        ? Map.of("result", "ok", "at", c.at().toString())
+                        : Map.of("result", "failed", "at", c.at().toString(), "reason", c.reason()))
+                .orElse("none yet"));
         return health.withDetail("circuit", gateway.circuitState().name()).build();
     }
 }
