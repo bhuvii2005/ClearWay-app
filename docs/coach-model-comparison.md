@@ -17,7 +17,7 @@ The gemini-3.5-flash low-effort run sent 4 requests for 3 calls. The extra one w
 
 ## Free-tier limits seen
 - **gemini-3.5-flash:** 20 requests per day, per project and per model (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`). The quota resets at midnight Pacific. Google serves this model as `gemini-3.6-flash`.
-- **gemini-3.5-flash-lite:** a separate quota from flash. Its exact limits are still to be confirmed from the AI Studio console.
+- **gemini-3.5-flash-lite:** a separate quota from flash: 15 requests a minute, 250K tokens a minute, 500 requests a day (AI Studio, 11 Nov 2026). The backup `gemini-3.1-flash-lite` has the same limits on its own quota.
 - **gemini-3.8-flash:** never replied on the free tier in testing (earlier in November 2026).
 
 ## Not compared
@@ -26,5 +26,5 @@ The gemini-3.5-flash low-effort run sent 4 requests for 3 calls. The extra one w
 
 ## Decision
 - **Coach and evals:** `gemini-3.5-flash-lite` with `low` reasoning effort is the default.
-- **Daily cap:** 20 requests a day until the real limits are known.
+- **Daily cap:** 400 chat requests a day (`CLEARWAY_AI_DAILY_REQUESTS`), set once the real limits were known. This leaves about 100 of the 500 for one eval run.
 - **When Google's quota runs out:** a per-day 429 from Google stops all chat calls until midnight Pacific.
