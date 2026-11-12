@@ -1,6 +1,6 @@
 # ClearWay AI features: handoff
 
-How far the AI work on `feature/ai-coach` has got, so a fresh session (or person) can pick it up. Last updated **12 Nov 2026, 08:30 IST**. Keep it current: update it at the end of every work session.
+How far the AI work on `feature/ai-coach` has got, so a fresh session (or person) can pick it up. Last updated **12 Nov 2026, 08:45 IST**. Keep it current: update it at the end of every work session.
 
 The full task list is in `ClearWay — AI Features Implementation Prompt (Coach + RAG + Evals).md` at the repo root. It's untracked on purpose, so don't commit it.
 
@@ -16,7 +16,7 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
 | 5 | Coach page in the UI (`/coach`) | done |
 | D | Wrap-up: README Coach section, technical doc, secret scan, full Docker test run, PR | **next** |
 
-The branch is pushed up to `23b1dbf`. Work after that (health detail, IPv6 README note, screenshots, this file) is committed locally first; see `git log origin/feature/ai-coach..HEAD`.
+The branch is pushed up to `261ab2f` (health detail, IPv6 README note, screenshots, this file). Check `git log origin/feature/ai-coach..HEAD` for anything committed but not yet pushed.
 
 ## Commits on the branch (oldest first)
 
@@ -36,6 +36,7 @@ The branch is pushed up to `23b1dbf`. Work after that (health detail, IPv6 READM
 | `a1df0cd` | Behaviour checks for two eval cases, 5 casual retrieval queries |
 | `b0b8dc4` | Docker: the API runs on IPv4 (fixes failing knowledge-base search in the container) |
 | `23b1dbf` | Phase 5: Coach page |
+| `261ab2f` | `lastEmbeddingCall` in health; health details only for the actuator login; IPv6 note, screenshots, this file |
 
 ## Config and limits
 
@@ -55,7 +56,8 @@ The branch is pushed up to `23b1dbf`. Work after that (health detail, IPv6 READM
 - **Actuator:**
   - Health is public, and its details are shown only to the metrics login.
   - Metrics and info need `CLEARWAY_METRICS_USER` / `CLEARWAY_METRICS_PASSWORD` (no defaults; the endpoints are off without them).
-  - **These are not in `.env` yet.** The user adds keys and passwords to `.env` themselves; never ask for them in chat.
+  - They're in `.env` (added by the user on 12 Nov). Read them inside commands; never print or log the password. The user adds keys and passwords to `.env` themselves; never ask for them in chat.
+  - A container reads `env_file` only when it's created: after changing `.env`, run `docker compose up -d api`, not `restart` (that asks first; see the working rules).
 - **Error body:** Coach 503s carry `code`: `budget`, `quota_exhausted`, `time_budget` or `provider_error`.
 
 ## Eval results so far
@@ -79,8 +81,8 @@ The branch is pushed up to `23b1dbf`. Work after that (health detail, IPv6 READM
 ## Open items and risks
 
 1. **Golden set rerun:** due 12 Nov after 1:30 PM IST. Run it with `./gradlew evalTest --tests '*CoachGoldenEvalTest'`. Update `docs/evals/baseline.md` only if the harness is final, and keep the honest 18/20 history.
-2. **Quota pre-flight check:** it can't read the app's usage until `CLEARWAY_METRICS_*` is set in `.env`. Until then a run says "couldn't be checked" and goes ahead.
-3. **Metrics in Docker:** check, on a freshly rebuilt stack, that Spring AI's `gen_ai.client.*` metrics appear and that `kb.search{result=error}` is 0 after a real knowledge-base question. This also needs the metrics login.
+2. **Quota pre-flight check:** it now works (the login was checked at 08:45 IST on 12 Nov). It reads the app's own counter, which resets when the API restarts, so it can undercount Google's real daily use. Yesterday's run and checks used about 75 of 500 flash-lite requests before the 1:30 PM IST reset.
+3. **Metrics in Docker:** check, on a freshly rebuilt stack, that Spring AI's `gen_ai.client.*` metrics appear and that `kb.search{result=error}` is 0 after a real knowledge-base question. The API container currently runs the image built on 11 Nov, so health details (`lastEmbeddingCall`) only appear after the wrap-up rebuild.
 4. **Known limits (for the README Coach section):**
    - conversation memory is in-memory only
    - budgets reset when the API restarts
@@ -107,6 +109,7 @@ The branch is pushed up to `23b1dbf`. Work after that (health detail, IPv6 READM
 
 - Free tiers only. Never Ollama.
 - Push only when told. Report and ask before anything major.
+- **Ask before starting, stopping or installing anything on the user's machine** (Docker Desktop, services, global tools). That includes recreating or rebuilding containers, unless the user has already approved that step.
 - Never commit secrets. Read keys from `.env` inside commands; never print them.
 - Docker reads secrets via `env_file: .env`, never from the Dockerfile or compose file. CI uses repository secrets and a throwaway Postgres.
 - Editing tip: Python string escapes have broken Java and YAML files twice. Use the Edit tool for Java strings that contain `\n` or regexes.
