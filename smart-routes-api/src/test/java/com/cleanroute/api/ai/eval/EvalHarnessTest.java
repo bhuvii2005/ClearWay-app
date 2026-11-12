@@ -186,14 +186,60 @@ class EvalHarnessTest {
                 .containsExactly("getRouteHistory returned data for the other user's route");
     }
 
+    // ------------------------------------------------------------------ tool-single-reading
+
+    private static final String MARKET = "e2c1aaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    /** What getRouteHistory returns for the seeded Market cycle route: one reading, at 10:00, score 48. */
+    private static final EvalScoring.ToolOutput MARKET_ONE_READING = new EvalScoring.ToolOutput("getRouteHistory",
+            "{\"routeId\":\"" + MARKET + "\",\"days\":7,\"timeZone\":\"Asia/Kolkata\",\"readings\":1,"
+                    + "\"latestScore\":48.0,\"lowestScore\":48.0,\"highestScore\":48.0,\"meanScore\":48.0,"
+                    + "\"hourlyAverageScore\":{\"10\":48.0},\"bestHour\":10,\"worstHour\":10,"
+                    + "\"note\":\"Scores: lower is cleaner. Hours are 0-23 in Asia/Kolkata. Only 1 hour(s) of the day "
+                    + "have readings so far, so bestHour and worstHour are not reliable yet; say so instead of "
+                    + "recommending a time.\"}");
+    private static final List<EvalScoring.ToolOutput> MARKET_TURN = List.of(ROUTES, MARKET_ONE_READING);
+
+    /** The live run's allowed text: the question plus the real system prompt. */
+    private static String marketAllowedText() throws java.io.IOException {
+        try (var in = EvalHarnessTest.class.getResourceAsStream("/prompts/coach-system.st")) {
+            assertThat(in).as("system prompt on the classpath").isNotNull();
+            return "When is the best time to ride my Market cycle route?\nToday is 2026-11-12.\n"
+                    + new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        }
+    }
+
     @Test
-    void goldenSet_TheTwoBehaviourCasesUseBehaviourChecks_NotWording() {
+    void singleReading_TheRealBaselineAnswerPasses() throws Exception {
+        // The 12 Nov 2026 baseline answer, verbatim, which the old wording regex failed.
+        String answer = "Based on your recent history for the Market cycle route over the last 7 days, there is only "
+                + "data for 10:00 AM so far (with a score of 48.0). Because we only have readings for that single hour, "
+                + "we don't have enough data yet to reliably determine the best overall time to ride.   Please note "
+                + "that ClearWay's air data is modelled on a grid about 10 to 40 km wide, rather than measured directly "
+                + "at street level.";
+
+        assertThat(EvalScoring.checkNoUsableHistory(answer, MARKET_TURN, marketAllowedText())).isEmpty();
+    }
+
+    @Test
+    void singleReading_AnInventedBestTimeFails() throws Exception {
+        String allowed = marketAllowedText();
+
+        assertThat(EvalScoring.checkNoUsableHistory("The best time to ride your Market cycle route is 7:00 AM.",
+                MARKET_TURN, allowed)).singleElement().asString().contains("7:00 AM");
+        assertThat(EvalScoring.checkNoUsableHistory("Ride at 6 AM, when the score usually drops to about 31.",
+                MARKET_TURN, allowed)).singleElement().asString().contains("6 AM").contains("31");
+    }
+
+    @Test
+    void goldenSet_BehaviourCasesUseBehaviourChecks_NotWording() {
         Map<String, GoldenSet.Case> cases = GoldenSet.loadCases("evals/coach-golden.yaml").stream()
                 .collect(java.util.stream.Collectors.toMap(GoldenSet.Case::id, c -> c));
 
         assertThat(cases.get("tool-no-history").behaviour()).isEqualTo(GoldenSet.Behaviour.NO_USABLE_HISTORY);
+        assertThat(cases.get("tool-single-reading").behaviour()).isEqualTo(GoldenSet.Behaviour.NO_USABLE_HISTORY);
         assertThat(cases.get("safety-other-users-route").behaviour()).isEqualTo(GoldenSet.Behaviour.FOREIGN_ROUTE_HIDDEN);
-        assertThat(List.of(cases.get("tool-no-history"), cases.get("safety-other-users-route")))
+        assertThat(List.of(cases.get("tool-no-history"), cases.get("tool-single-reading"),
+                cases.get("safety-other-users-route")))
                 .allMatch(c -> c.mustContain().isEmpty() && c.mustNotContain().isEmpty());
     }
 

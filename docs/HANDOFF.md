@@ -1,6 +1,6 @@
 # ClearWay AI features: handoff
 
-How far the AI work on `feature/ai-coach` has got, so a fresh session (or person) can pick it up. Last updated **12 Nov 2026, 12:10 IST**. Keep it current: update it at the end of every work session.
+How far the AI work on `feature/ai-coach` has got, so a fresh session (or person) can pick it up. Last updated **12 Nov 2026, 16:10 IST**. Keep it current: update it at the end of every work session.
 
 The full task list is in `ClearWay — AI Features Implementation Prompt (Coach + RAG + Evals).md` at the repo root. It's untracked on purpose, so don't commit it.
 
@@ -69,13 +69,14 @@ The branch is pushed and PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull
 | 12 Nov 2026, 11:22 IST ([baseline](evals/baseline.md)) | 19/20 | 7/8 | 4/4 | 4/4 | 4/4 | 46 / 61,178 |
 | 11 Nov 2026, 08:41 IST ([first run](evals/2026-11-11-first-run.md)) | 18/20 | 7/8 | 4/4 | 4/4 | 3/4 | 48 / 64,390 |
 
-- Every failure so far was a wording regex rejecting a correct answer. On 12 Nov that was `tool-single-reading` ("only data for 10:00 AM… don't have enough data"). Converting it to the `no_usable_history` behaviour check is proposed but **not done**: the user decides, because changing a check right after it fails looks like weakening it.
+- Every failure so far was a wording regex rejecting a correct answer. On 12 Nov that was `tool-single-reading` ("only data for 10:00 AM… don't have enough data").
+- **Changed after the baseline (user-approved, 12 Nov):** `tool-single-reading` now uses the `no_usable_history` behaviour check. Unit tests: the real 12 Nov answer passes, an invented best time fails. The check now also requires an answer's hours to be the tool's hours (`hourlyAverageScore` keys, `bestHour`, `worstHour`), because "7:00 AM" was grounded by `"days":7`. No live rerun yet, so the reported result stays **19/20**.
 - Retrieval (15 queries): recall@4 100% at 0.60 and 93% at 0.65; MRR 0.97; 0% off-topic false positives. The threshold stays at 0.60.
 - The next golden run is due no sooner than the next quota day (after 1:30 PM IST). It shares the 500/day quota with the app.
 
 ## Tests (last full runs, 12 Nov 2026, freshly rebuilt Docker stack)
 
-- **Backend:** `./gradlew build` passed 149 tests, with no model calls.
+- **Backend:** `./gradlew build` passed 149 tests, with no model calls (151 after the `tool-single-reading` change, rerun on the host on 12 Nov).
 - **UI:** 47 Vitest tests pass; lint and build are clean.
 - **e2e:** `E2E_BASE_URL=http://localhost:4173 npm run e2e` passed against the Docker web app.
 - **Docker AI check:** a real knowledge-base question came back with 3 sources.
@@ -85,8 +86,9 @@ The branch is pushed and PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull
 
 ## Open items and risks
 
-1. **PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull/1) is open, not merged.** The user reviews and merges.
-2. **`tool-single-reading` wording check:** proposed conversion to a behaviour check (see above), waiting for the user.
+1. **PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull/1) is open, not merged.** The user merges it with a merge commit (not squash).
+   - `origin/main` was fast-forwarded to `dcb4d5c` (7 UI commits that had only been on local main) on 12 Nov, with the user's OK, so the PR shows only the AI commits.
+2. **Golden set not rerun since the `tool-single-reading` change:** the next live run (next quota day) is the first with all three behaviour checks.
 3. **Shared quota:** the app and the evals share 500 chat requests a day, and the app's counter resets on restart, so the pre-flight check can undercount Google's real use.
 4. **Known limits:**
    - conversation memory is in-memory only
@@ -98,7 +100,7 @@ The branch is pushed and PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull
 ## Remaining steps
 
 1. The user reviews the PR. Merge only when the user says so; never merge on your own.
-2. If the user agrees, convert `tool-single-reading` to the behaviour check. Then run the golden set once on the next quota day, and update `docs/evals/baseline.md` only if all harness changes are final.
+2. Run the golden set once on a later quota day (after 1:30 PM IST, check usage via metrics first), and update `docs/evals/baseline.md` only if all harness changes are final.
 3. Keep this file current after every session.
 
 ## Working rules (from the user)

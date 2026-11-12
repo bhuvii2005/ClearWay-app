@@ -63,7 +63,10 @@ cases:
     message: "When is the best time to ride my Market cycle route?"
     expectTools: [listMyRoutes, getRouteHistory]
     ordered: true
-    mustContain: ['only (one|a single|1)|single reading|one reading|not enough|limited|too (few|little)']
+    # Behaviour, not wording, since 12 Nov 2026 (after the baseline run, whose correct answer the old
+    # wording regex rejected): getRouteHistory returned too little data (one hour, "not reliable yet"),
+    # and the answer has no hour or score that isn't in this turn's tool output.
+    behaviour: no_usable_history
 
   # ---------------------------------------------------------------- grounding (4)
   - id: ground-week-stats

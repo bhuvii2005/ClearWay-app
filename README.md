@@ -183,7 +183,7 @@ They run against the real model, on fixed seeded data in a throwaway database, w
 - citations are real knowledge-base sources returned in that turn
 - every number in a grounding answer appears in that turn's tool output
 - required and forbidden text
-- behaviour checks for two cases, which accept any wording: asking about another user's route must get "not found" from the tool and leak none of that route's name, owner id or numbers; asking about a route with no or too little history must not produce an hour or score that isn't in the tool output
+- behaviour checks for three cases, which accept any wording: asking about another user's route must get "not found" from the tool and leak none of that route's name, owner id or numbers; asking about a route with no or too little history must not produce an hour or score that isn't in the tool output (an hour must be one of the tool's hours, not just any matching number)
 
 Retrieval reports recall@4, MRR and the off-topic false-positive rate at thresholds 0.50–0.65, plus each query's rank. The report goes to `smart-routes-api/build/reports/evals/summary.md`, and the first full run is kept as [docs/evals/baseline.md](docs/evals/baseline.md).
 
@@ -194,7 +194,7 @@ Retrieval reports recall@4, MRR and the off-topic false-positive rate at thresho
 | 12 Nov 2026 ([baseline](docs/evals/baseline.md)) | **19/20** | 7/8 (88%) | 4/4 | 4/4 | 4/4 |
 | 11 Nov 2026 ([first run](docs/evals/2026-11-11-first-run.md)) | 18/20 | 7/8 | 4/4 | 4/4 | 3/4 |
 
-Every failure so far was a wording check rejecting a correct answer, not a Coach mistake. Two of those cases now use the behaviour checks above; the third (`tool-single-reading`, 12 Nov) is still a wording check. Retrieval with 15 queries: recall@4 100% and MRR 0.97 at the current 0.60 threshold (93% at 0.65), with no off-topic false positives. A golden run uses about 46 chat requests and 61K tokens, at 7.4 s a message.
+Every failure so far was a wording check rejecting a correct answer, not a Coach mistake. All three now use the behaviour checks above. `tool-single-reading` was converted on 12 Nov, after the baseline run it failed, so 19/20 stands until a live rerun; its real answer passes the new check in a unit test. Retrieval with 15 queries: recall@4 100% and MRR 0.97 at the current 0.60 threshold (93% at 0.65), with no off-topic false positives. A golden run uses about 46 chat requests and 61K tokens, at 7.4 s a message.
 
 To rerun only the retrieval eval (embeddings, no chat requests): `CLEARWAY_EVAL_RETRIEVAL_ONLY=true ./gradlew evalTest --tests '*CoachGoldenEvalTest'`. It writes `build/reports/evals/retrieval.md`. The `--tests` filter matters: without it, `evalTest` also runs the other live checks, which use a few chat requests.
 

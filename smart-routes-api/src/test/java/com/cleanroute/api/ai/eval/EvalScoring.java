@@ -125,7 +125,8 @@ public final class EvalScoring {
         return ungrounded;
     }
 
-    record Value(BigDecimal number, String written) {
+    /** A value in a text; {@code time} is true when it was written as a time of day (its number is the hour). */
+    record Value(BigDecimal number, String written, boolean time) {
     }
 
     /** The values in a text: times as their hour (0-23), other numbers as written; names like PM2.5 skipped. */
@@ -144,7 +145,7 @@ public final class EvalScoring {
         while (t.find()) {
             Integer hour = hour(t);
             if (hour != null) {
-                out.add(new Value(BigDecimal.valueOf(hour), t.group()));
+                out.add(new Value(BigDecimal.valueOf(hour), t.group(), true));
                 rest.append(s, last, t.start()).append(' ');
                 last = t.end();
             }
@@ -154,7 +155,7 @@ public final class EvalScoring {
         while (n.find()) {
             String raw = n.group().replace(',', '.');
             try {
-                out.add(new Value(normalise(new BigDecimal(raw)), n.group()));
+                out.add(new Value(normalise(new BigDecimal(raw)), n.group(), false));
             } catch (NumberFormatException ignored) {
                 // not a number after all
             }
@@ -254,8 +255,10 @@ public final class EvalScoring {
     /**
      * A route with no (or too little) history: every getRouteHistory result had no readings or said
      * its hours are not reliable, and the answer has no hour or number missing from this turn's tool
-     * output (or the question and system prompt). So "it has no data yet" passes in any wording, and
-     * an invented best time fails.
+     * output (or the question and system prompt). A time in the answer must be one of the tool's hours
+     * (hourlyAverageScore keys, bestHour, worstHour), not just any matching number such as "days":7.
+     * So "it has no data yet" or "only data for 10:00 AM" passes in any wording, and an invented best
+     * time fails.
      */
     public static List<String> checkNoUsableHistory(String answer, List<ToolOutput> outputs, String allowedText) {
         List<String> problems = new ArrayList<>();
@@ -271,11 +274,41 @@ public final class EvalScoring {
             }
         }
         String toolText = String.join("\n", outputs.stream().map(ToolOutput::data).toList());
-        List<String> invented = ungroundedNumbers(answer, toolText, allowedText);
+        List<String> invented = new ArrayList<>(ungroundedNumbers(answer, toolText, allowedText));
+        Set<BigDecimal> hours = toolHours(history);
+        values(allowedText, false).stream().filter(Value::time).map(Value::number).forEach(hours::add);
+        for (Value v : values(answer, true)) {
+            if (v.time() && !hours.contains(v.number()) && !invented.contains(v.written())) {
+                invented.add(v.written());
+            }
+        }
         if (!invented.isEmpty()) {
             problems.add("answer has hours or numbers not in the tool output: " + String.join(", ", invented));
         }
         return problems;
+    }
+
+    private static final Pattern HOUR_FIELD = Pattern.compile("\"(?:bestHour|worstHour)\"\\s*:\\s*(\\d{1,2})\\b");
+    private static final Pattern HOURLY_MAP = Pattern.compile("\"hourlyAverageScore\"\\s*:\\s*\\{([^}]*)}");
+    private static final Pattern HOURLY_KEY = Pattern.compile("\"(\\d{1,2})\"\\s*:");
+
+    /** The hours of the day getRouteHistory reported: its hourly-average keys, bestHour and worstHour. */
+    private static Set<BigDecimal> toolHours(List<ToolOutput> history) {
+        Set<BigDecimal> hours = new LinkedHashSet<>();
+        for (ToolOutput o : history) {
+            Matcher f = HOUR_FIELD.matcher(o.data());
+            while (f.find()) {
+                hours.add(BigDecimal.valueOf(Integer.parseInt(f.group(1))));
+            }
+            Matcher map = HOURLY_MAP.matcher(o.data());
+            while (map.find()) {
+                Matcher k = HOURLY_KEY.matcher(map.group(1));
+                while (k.find()) {
+                    hours.add(BigDecimal.valueOf(Integer.parseInt(k.group(1))));
+                }
+            }
+        }
+        return hours;
     }
 
     private static String describe(List<String> called) {
