@@ -16,7 +16,7 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
 | 5 | Coach page in the UI (`/coach`) | done |
 | D | Wrap-up: README Coach section, technical doc, secret scan, full Docker test run, PR | done; PR open, **not merged** |
 
-The branch is pushed and the PR is open (see the PR link in the latest commit or on GitHub). Check `git log origin/feature/ai-coach..HEAD` for anything committed but not yet pushed.
+The branch is pushed and PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull/1) is open, not merged. Check `git log origin/feature/ai-coach..HEAD` for anything committed but not yet pushed.
 
 ## Commits on the branch (oldest first)
 
@@ -85,7 +85,7 @@ The branch is pushed and the PR is open (see the PR link in the latest commit or
 
 ## Open items and risks
 
-1. **PR open, not merged.** The user reviews and merges.
+1. **PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull/1) is open, not merged.** The user reviews and merges.
 2. **`tool-single-reading` wording check:** proposed conversion to a behaviour check (see above), waiting for the user.
 3. **Shared quota:** the app and the evals share 500 chat requests a day, and the app's counter resets on restart, so the pre-flight check can undercount Google's real use.
 4. **Known limits:**
