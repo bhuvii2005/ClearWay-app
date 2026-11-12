@@ -317,10 +317,38 @@ class EvalHarnessTest {
 
         assertThat(md).contains("Partial run").contains("1 case(s) not run")
                 .contains("| Tool selection | 1 | 1 | 1 | 50% | 85% | no |")
-                .contains("### tool-bad").contains("expected tool listMyRoutes was not called").contains("Some \\| answer")
+                .contains("### tool-bad (failed)").contains("- **Problem:** expected tool listMyRoutes was not called")
+                .contains("```text\nSome | answer\n```")
                 .contains("| 0.60 (current) | 90% | 0.85 | 0% |").contains("lowest score was 0.612").contains("0.445")
                 .contains("`gemini-3.5-flash-lite`").contains("5 of 70 allowed")
                 .contains("| casual q | who.md | 2 | 0.633 |").contains("| missed q | aqi.md | not found | - |");
+    }
+
+    @Test
+    void report_SavesTheAnswerAndToolsOfEveryCase_PassedOrFailed() {
+        // A passing answer must be auditable too (issue #2: did tool-single-reading call one reading "the best time"?).
+        String multiLine = "Your Market cycle route has only one reading, at 10:00.\n\n* PM2.5 was 31.\n# not a heading";
+        List<CaseResult> results = List.of(
+                new CaseResult(testCase("tool-single-reading"), Status.PASSED, List.of(), multiLine,
+                        List.of("listMyRoutes", "getRouteHistory"), 3, 1_200, 5_000),
+                new CaseResult(testCase("kb-who"), Status.PASSED, List.of(), "Use `code` and ```fences```.",
+                        List.of(), 1, 400, 2_000),
+                new CaseResult(testCase("tool-error"), Status.FAILED, List.of("error 500: boom"), null, List.of(), 1, 0, 100),
+                CaseResult.notRun(testCase("tool-later"), "stopped: budget"));
+        var info = new EvalReport.RunInfo(ZonedDateTime.now(), "gemini", "m", Set.of("m"), 5, 1_600, 0, 70, null, null,
+                "stopped: budget");
+
+        String md = EvalReport.render(info, results, null);
+
+        assertThat(md).contains("## Answers")
+                .contains("### tool-single-reading (passed)\n\n- **Question:** question tool-single-reading\n"
+                        + "- **Tools called:** `listMyRoutes`, `getRouteHistory`\n- **Answer:**\n\n```text\n"
+                        + multiLine + "\n```\n")
+                .contains("### kb-who (passed)").contains("- **Tools called:** none")
+                .contains("````text\nUse `code` and ```fences```.\n````\n")
+                .contains("### tool-error (failed)").contains("- **Problem:** error 500: boom").contains("- **Answer:** none")
+                .contains("### tool-later (not run)\n\nNot run: stopped: budget\n");
+        assertThat(md).doesNotContain("## Failed cases");
     }
 
     @Test

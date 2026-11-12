@@ -77,12 +77,12 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
 - Every failure so far was a wording regex rejecting a correct answer. On the 12 Nov morning run that was `tool-single-reading` ("only data for 10:00 AM… don't have enough data").
 - **Changed after the baseline (user-approved, 12 Nov):** `tool-single-reading` now uses the `no_usable_history` behaviour check. Unit tests: the real 12 Nov answer passes, an invented best time fails. The check now also requires an answer's hours to be the tool's hours (`hourlyAverageScore` keys, `bestHour`, `worstHour`), because "7:00 AM" was grounded by `"days":7`. The morning run stays 19/20. The 17:32 IST run (`main`, `50b5c2d`, 0 app requests before it, new quota day) was the first live run with all three behaviour checks: **20/20**.
 - Retrieval (15 queries): recall@4 100% at 0.60 and 93% at 0.65; MRR 0.97; 0% off-topic false positives. The threshold stays at 0.60.
-- **Passing answers aren't saved in the report.** So the 17:32 run can't show whether `tool-single-reading` called the one 10:00 reading "the best time"; see issue [#2](https://github.com/bhuvii2005/ClearWay-app/issues/2).
+- **The 17:32 report didn't save passing answers**, so it can't show whether `tool-single-reading` called the one 10:00 reading "the best time" (issue [#2](https://github.com/bhuvii2005/ClearWay-app/issues/2)). Fixed after that run: the report's **Answers** section now has every case's question, tools called and verbatim answer, passed or failed (unit-tested; no live rerun yet).
 - Golden runs share the 500/day quota with the app: at most one a quota day (after 1:30 PM IST), and check usage via metrics first.
 
 ## Tests (last full runs, 12 Nov 2026, freshly rebuilt Docker stack)
 
-- **Backend:** `./gradlew build` passed 149 tests, with no model calls (151 after the `tool-single-reading` change, rerun on the host on 12 Nov).
+- **Backend:** `./gradlew build` passed 149 tests, with no model calls (151 after the `tool-single-reading` change, 152 after the eval report saves every answer; both rerun on the host on 12 Nov).
 - **UI:** 47 Vitest tests pass; lint and build are clean.
 - **e2e:** `E2E_BASE_URL=http://localhost:4173 npm run e2e` passed against the Docker web app.
 - **Docker AI check:** a real knowledge-base question came back with 3 sources.
@@ -93,14 +93,14 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
 ## Open items and risks
 
 1. **Issue [#2](https://github.com/bhuvii2005/ClearWay-app/issues/2), not implemented:** the Coach shouldn't call a single reading the "best time". Possible fix: a must-not-recommend eval check plus a system-prompt rule, maybe `bestHour`/`worstHour` = null when too few hours.
-2. **Passing answers aren't recorded** in the eval report, so a pass can't be inspected afterwards. Worth adding together with issue #2.
+2. **Eval report answers:** done on `docs/eval-2026-11-12`; every case's answer and tools are saved. The next live run is the first to use it; check `tool-single-reading` there for issue #2.
 3. **Shared quota:** the app and the evals share 500 chat requests a day, and the app's counter resets on restart, so the pre-flight check can undercount Google's real use.
 4. **Known limits:**
    - conversation memory is in-memory only
    - budgets reset when the API restarts
    - air data is modelled on a 10–40 km grid
    - one API replica is assumed
-5. **External flakiness:** TomTom, Photon and Open-Meteo sometimes fail the e2e smoke test; this is documented, so rerun it before suspecting the app. A Docker web build once failed with a truncated base-image download, and a retry fixed it.
+5. **External flakiness:** TomTom, Photon and Open-Meteo sometimes fail the e2e smoke test; this is documented, so rerun it before suspecting the app. Issue [#3](https://github.com/bhuvii2005/ClearWay-app/issues/3) proposes mocking them in the default smoke run and keeping one optional live run (not implemented). A Docker web build once failed with a truncated base-image download, and a retry fixed it.
 
 ## Remaining steps
 

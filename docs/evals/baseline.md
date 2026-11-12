@@ -17,7 +17,7 @@ This is the first golden set run with all three behaviour checks, on `main` afte
 - The app had sent 0 chat requests that day, read through the actuator login.
 - It used 47 of 70 allowed chat requests.
 
-**One limit of this report:** the answers to passing cases aren't saved. So this run shows that the `tool-single-reading` answer invented no hour or score, but not whether it presented the one 10:00 reading as "the best time". The check can't catch that yet. It's tracked in [issue #2](https://github.com/bhuvii2005/ClearWay-app/issues/2).
+**One limit of this report:** the answers to passing cases aren't saved. So this run shows that the `tool-single-reading` answer invented no hour or score, but not whether it presented the one 10:00 reading as "the best time". The check can't catch that yet. It's tracked in [issue #2](https://github.com/bhuvii2005/ClearWay-app/issues/2). Since this run, the report saves every case's answer and tools called, passed or failed, so the next run will show it.
 
 ---
 

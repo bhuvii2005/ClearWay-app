@@ -185,7 +185,7 @@ They run against the real model, on fixed seeded data in a throwaway database, w
 - required and forbidden text
 - behaviour checks for three cases, which accept any wording: asking about another user's route must get "not found" from the tool and leak none of that route's name, owner id or numbers; asking about a route with no or too little history must not produce an hour or score that isn't in the tool output (an hour must be one of the tool's hours, not just any matching number)
 
-Retrieval reports recall@4, MRR and the off-topic false-positive rate at thresholds 0.50–0.65, plus each query's rank. The report goes to `smart-routes-api/build/reports/evals/summary.md`, and the current baseline is kept as [docs/evals/baseline.md](docs/evals/baseline.md), with earlier runs beside it.
+Retrieval reports recall@4, MRR and the off-topic false-positive rate at thresholds 0.50–0.65, plus each query's rank. The report goes to `smart-routes-api/build/reports/evals/summary.md`. It keeps every case's question, the tools called and the answer verbatim, passed or failed, so a run can be audited later. The current baseline is kept as [docs/evals/baseline.md](docs/evals/baseline.md), with earlier runs beside it.
 
 **Results so far** (single runs; model answers vary from run to run, so each run is a sample, not a guarantee):
 
