@@ -1,6 +1,8 @@
 # ClearWay AI features: handoff
 
-How far the AI work on `feature/ai-coach` has got, so a fresh session (or person) can pick it up. Last updated **12 Nov 2026, 16:10 IST**. Keep it current: update it at the end of every work session.
+**Status: shipped.** The AI Coach (PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull/1)) was merged into `main` on 12 Nov 2026 as merge commit `50b5c2d`, and CI on `main` is green.
+
+This file records how the AI work stands, so a fresh session (or person) can pick it up. Last updated **12 Nov 2026, 18:00 IST**. Keep it current: update it at the end of every work session.
 
 The full task list is in `ClearWay — AI Features Implementation Prompt (Coach + RAG + Evals).md` at the repo root. It's untracked on purpose, so don't commit it.
 
@@ -12,13 +14,13 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
 | 1 | Provider layer for free-tier LLMs (Gemini by default, Groq optional), budgets, circuit breaker | done |
 | 2 | Knowledge base: Gemini embeddings, pgvector (migration V6), search with a threshold | done |
 | 3 | Coach: `POST /api/v1/coach/chat` with read-only tools, server-side identity | done |
-| 4 | Evals (20-case golden set, retrieval eval), Micrometer metrics, per-message log | done; baseline 19/20 (12 Nov) |
+| 4 | Evals (20-case golden set, retrieval eval), Micrometer metrics, per-message log | done; baseline 20/20 (12 Nov, 17:32 IST) |
 | 5 | Coach page in the UI (`/coach`) | done |
-| D | Wrap-up: README Coach section, technical doc, secret scan, full Docker test run, PR | done; PR open, **not merged** |
+| D | Wrap-up: README Coach section, technical doc, secret scan, full Docker test run, PR | done; **merged** (`50b5c2d`) |
 
-The branch is pushed and PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull/1) is open, not merged. Check `git log origin/feature/ai-coach..HEAD` for anything committed but not yet pushed.
+`feature/ai-coach` is merged; new work goes on new branches from `main`.
 
-## Commits on the branch (oldest first)
+## Commits in PR #1 (oldest first)
 
 | Commit | What |
 |---|---|
@@ -38,7 +40,9 @@ The branch is pushed and PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull
 | `23b1dbf` | Phase 5: Coach page |
 | `261ab2f` | `lastEmbeddingCall` in health; health details only for the actuator login; IPv6 note, screenshots, this file |
 | `51e66cf` | Handoff update (metrics login, machine-changes rule) |
-| wrap-up | README Coach section, technical doc section 15 and ADR-33 to ADR-38, 12 Nov baseline, `.env.example` additions |
+| `584aa90`, `3f78d91`, `cfcd475` | Wrap-up: README Coach section, technical doc section 15 and ADR-33 to ADR-38, `.env.example` additions, handoff |
+| `1565c53` | Behaviour check for `tool-single-reading` (and hours must be the tool's hours) |
+| `50b5c2d` | Merge commit into `main` |
 
 ## Config and limits
 
@@ -66,17 +70,19 @@ The branch is pushed and PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull
 
 | Run | Golden set | Tools | Grounding | KB | Safety | Requests / tokens |
 |---|---|---|---|---|---|---|
-| 12 Nov 2026, 11:22 IST ([baseline](evals/baseline.md)) | 19/20 | 7/8 | 4/4 | 4/4 | 4/4 | 46 / 61,178 |
+| 12 Nov 2026, 17:32 IST ([baseline](evals/baseline.md)) | **20/20** | 8/8 | 4/4 | 4/4 | 4/4 | 47 / 59,908 |
+| 12 Nov 2026, 11:22 IST ([morning run](evals/2026-11-12-morning-run.md)) | 19/20 | 7/8 | 4/4 | 4/4 | 4/4 | 46 / 61,178 |
 | 11 Nov 2026, 08:41 IST ([first run](evals/2026-11-11-first-run.md)) | 18/20 | 7/8 | 4/4 | 4/4 | 3/4 | 48 / 64,390 |
 
-- Every failure so far was a wording regex rejecting a correct answer. On 12 Nov that was `tool-single-reading` ("only data for 10:00 AM… don't have enough data").
-- **Changed after the baseline (user-approved, 12 Nov):** `tool-single-reading` now uses the `no_usable_history` behaviour check. Unit tests: the real 12 Nov answer passes, an invented best time fails. The check now also requires an answer's hours to be the tool's hours (`hourlyAverageScore` keys, `bestHour`, `worstHour`), because "7:00 AM" was grounded by `"days":7`. No live rerun yet, so the reported result stays **19/20**.
+- Every failure so far was a wording regex rejecting a correct answer. On the 12 Nov morning run that was `tool-single-reading` ("only data for 10:00 AM… don't have enough data").
+- **Changed after the baseline (user-approved, 12 Nov):** `tool-single-reading` now uses the `no_usable_history` behaviour check. Unit tests: the real 12 Nov answer passes, an invented best time fails. The check now also requires an answer's hours to be the tool's hours (`hourlyAverageScore` keys, `bestHour`, `worstHour`), because "7:00 AM" was grounded by `"days":7`. The morning run stays 19/20. The 17:32 IST run (`main`, `50b5c2d`, 0 app requests before it, new quota day) was the first live run with all three behaviour checks: **20/20**.
 - Retrieval (15 queries): recall@4 100% at 0.60 and 93% at 0.65; MRR 0.97; 0% off-topic false positives. The threshold stays at 0.60.
-- The next golden run is due no sooner than the next quota day (after 1:30 PM IST). It shares the 500/day quota with the app.
+- **The 17:32 report didn't save passing answers**, so it can't show whether `tool-single-reading` called the one 10:00 reading "the best time" (issue [#2](https://github.com/bhuvii2005/ClearWay-app/issues/2)). Fixed after that run: the report's **Answers** section now has every case's question, tools called and verbatim answer, passed or failed (unit-tested; no live rerun yet).
+- Golden runs share the 500/day quota with the app: at most one a quota day (after 1:30 PM IST), and check usage via metrics first.
 
 ## Tests (last full runs, 12 Nov 2026, freshly rebuilt Docker stack)
 
-- **Backend:** `./gradlew build` passed 149 tests, with no model calls (151 after the `tool-single-reading` change, rerun on the host on 12 Nov).
+- **Backend:** `./gradlew build` passed 149 tests, with no model calls (151 after the `tool-single-reading` change, 152 after the eval report saves every answer; both rerun on the host on 12 Nov).
 - **UI:** 47 Vitest tests pass; lint and build are clean.
 - **e2e:** `E2E_BASE_URL=http://localhost:4173 npm run e2e` passed against the Docker web app.
 - **Docker AI check:** a real knowledge-base question came back with 3 sources.
@@ -86,21 +92,20 @@ The branch is pushed and PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull
 
 ## Open items and risks
 
-1. **PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull/1) is open, not merged.** The user merges it with a merge commit (not squash).
-   - `origin/main` was fast-forwarded to `dcb4d5c` (7 UI commits that had only been on local main) on 12 Nov, with the user's OK, so the PR shows only the AI commits.
-2. **Golden set not rerun since the `tool-single-reading` change:** the next live run (next quota day) is the first with all three behaviour checks.
+1. **Issue [#2](https://github.com/bhuvii2005/ClearWay-app/issues/2), not implemented:** the Coach shouldn't call a single reading the "best time". Possible fix: a must-not-recommend eval check plus a system-prompt rule, maybe `bestHour`/`worstHour` = null when too few hours.
+2. **Eval report answers:** done on `docs/eval-2026-11-12`; every case's answer and tools are saved. The next live run is the first to use it; check `tool-single-reading` there for issue #2.
 3. **Shared quota:** the app and the evals share 500 chat requests a day, and the app's counter resets on restart, so the pre-flight check can undercount Google's real use.
 4. **Known limits:**
    - conversation memory is in-memory only
    - budgets reset when the API restarts
    - air data is modelled on a 10–40 km grid
    - one API replica is assumed
-5. **External flakiness:** TomTom, Photon and Open-Meteo sometimes fail the e2e smoke test; this is documented, so rerun it before suspecting the app. A Docker web build once failed with a truncated base-image download, and a retry fixed it.
+5. **External flakiness:** TomTom, Photon and Open-Meteo sometimes fail the e2e smoke test; this is documented, so rerun it before suspecting the app. Issue [#3](https://github.com/bhuvii2005/ClearWay-app/issues/3) proposes mocking them in the default smoke run and keeping one optional live run (not implemented). A Docker web build once failed with a truncated base-image download, and a retry fixed it.
 
 ## Remaining steps
 
-1. The user reviews the PR. Merge only when the user says so; never merge on your own.
-2. Run the golden set once on a later quota day (after 1:30 PM IST, check usage via metrics first), and update `docs/evals/baseline.md` only if all harness changes are final.
+1. The AI feature is shipped; nothing is pending for it apart from issue #2. Merge anything only when the user says so (the user merges with a merge commit, not squash).
+2. Follow-ups get their own branch and PR. The next one is Coach voice input (`feature/coach-voice-input`, frontend only).
 3. Keep this file current after every session.
 
 ## Working rules (from the user)

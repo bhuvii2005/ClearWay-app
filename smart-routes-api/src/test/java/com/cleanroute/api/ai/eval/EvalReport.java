@@ -123,20 +123,47 @@ public final class EvalReport {
                     .append(" |\n");
         }
 
-        List<CaseResult> failed = results.stream().filter(r -> r.status() == Status.FAILED).toList();
-        if (!failed.isEmpty()) {
-            md.append("\n## Failed cases\n");
-            for (CaseResult r : failed) {
-                md.append("\n### ").append(r.testCase().id()).append("\n\n");
-                md.append("- **Question:** ").append(oneLine(r.testCase().message())).append('\n');
-                for (String p : r.problems()) {
-                    md.append("- ").append(oneLine(p)).append('\n');
-                }
-                if (r.answer() != null) {
-                    md.append("- **Answer:** ").append(oneLine(r.answer())).append('\n');
-                }
+        answers(md, results);
+    }
+
+    /**
+     * Every case that ran, passed or failed, with its question, the tools called and the answer
+     * verbatim, so a run can be audited later without rerunning it.
+     */
+    private static void answers(StringBuilder md, List<CaseResult> results) {
+        md.append("\n## Answers\n\nEvery case that ran, passed or failed. Answers are verbatim.\n");
+        for (CaseResult r : results) {
+            md.append("\n### ").append(r.testCase().id()).append(" (")
+                    .append(r.status().name().toLowerCase(Locale.ROOT).replace('_', ' ')).append(")\n\n");
+            if (r.status() == Status.NOT_RUN) {
+                md.append("Not run: ").append(oneLine(String.join("; ", r.problems()))).append('\n');
+                continue;
+            }
+            md.append("- **Question:** ").append(oneLine(r.testCase().message())).append('\n');
+            md.append("- **Tools called:** ").append(r.toolsUsed().isEmpty() ? "none"
+                    : r.toolsUsed().stream().map(t -> "`" + t + "`").collect(Collectors.joining(", "))).append('\n');
+            for (String p : r.problems()) {
+                md.append("- **Problem:** ").append(oneLine(p)).append('\n');
+            }
+            if (r.answer() == null) {
+                md.append("- **Answer:** none\n");
+            } else {
+                md.append("- **Answer:**\n\n").append(fenced(r.answer()));
             }
         }
+    }
+
+    /** The text in a fenced block, with a fence longer than any backtick run inside it. */
+    static String fenced(String text) {
+        int longest = 0;
+        int run = 0;
+        for (char ch : text.toCharArray()) {
+            run = ch == '`' ? run + 1 : 0;
+            longest = Math.max(longest, run);
+        }
+        String fence = "`".repeat(Math.max(3, longest + 1));
+        String body = text.replace("\r\n", "\n").stripTrailing();
+        return fence + "text\n" + body + "\n" + fence + "\n";
     }
 
     private static void retrieval(StringBuilder md, Retrieval retrieval) {
