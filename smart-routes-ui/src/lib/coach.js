@@ -47,6 +47,39 @@ export function plainText(answer = '') {
     .replace(/^#{1,6}\s+/gm, '');
 }
 
+/**
+ * Appends spoken text to what's already typed, with a space between, never past {@code max}.
+ * Typed text is never cut: only the transcript is trimmed to fit.
+ *
+ * @returns {{ text: string, truncated: boolean }}
+ */
+export function appendTranscript(current = '', transcript = '', max = COACH_MAX_CHARS) {
+  const spoken = transcript.trim();
+  if (!spoken) return { text: current, truncated: false };
+  const separator = current && !/\s$/.test(current) ? ' ' : '';
+  const room = Math.max(0, max - current.length - separator.length);
+  if (room === 0) return { text: current, truncated: true };
+  const added = spoken.slice(0, room);
+  return { text: current + separator + added, truncated: added.length < spoken.length };
+}
+
+export const VOICE_SUPPORT_NOTE = 'Voice input works in Chrome, Edge and Safari.';
+export const VOICE_PRIVACY_NOTE = "Voice uses your browser's speech service; in Chrome, audio is sent to Google to transcribe.";
+
+const SPEECH_ERRORS = {
+  'not-allowed': "Microphone access is blocked. Allow it in your browser's site settings.",
+  'service-not-allowed': "Microphone access is blocked. Allow it in your browser's site settings.",
+  'audio-capture': 'No microphone found.',
+  'no-speech': "Didn't catch that. Try again.",
+  network: 'Speech service unreachable. Check your connection.',
+};
+
+/** Friendly text for a speech recognition error code; '' for "aborted" (the user or the app stopped it). */
+export function speechErrorMessage(code) {
+  if (!code || code === 'aborted') return '';
+  return SPEECH_ERRORS[code] ?? 'Voice input stopped. Please try again.';
+}
+
 /** errorMessage() for the Coach, with the cases that only make sense here. */
 export function coachErrorMessage(error) {
   if (!error?.response) {

@@ -1,8 +1,20 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'motion/react';
 import { coachApi } from '../lib/api';
-import { COACH_MAX_CHARS, SUGGESTIONS, coachErrorMessage, plainText, safeCitations, toolChips } from '../lib/coach';
+import {
+  COACH_MAX_CHARS,
+  SUGGESTIONS,
+  VOICE_PRIVACY_NOTE,
+  VOICE_SUPPORT_NOTE,
+  appendTranscript,
+  coachErrorMessage,
+  plainText,
+  safeCitations,
+  speechErrorMessage,
+  toolChips,
+} from '../lib/coach';
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import Icon from '../components/Icon';
 import { Button, ErrorNote } from '../components/ui';
 
@@ -34,6 +46,37 @@ export default function CoachPage() {
   const endRef = useRef(null);
   const inputId = useId();
   const counterId = useId();
+  // Voice input only ever fills the box; the user reads it and presses Send.
+  const [voiceTruncated, setVoiceTruncated] = useState(false);
+  const [voiceUsed, setVoiceUsed] = useState(false);
+  const latestInput = useRef(input);
+  useEffect(() => {
+    latestInput.current = input;
+  }, [input]);
+  const onTranscript = useCallback((spoken) => {
+    const { text, truncated } = appendTranscript(latestInput.current, spoken);
+    latestInput.current = text;
+    setInput(text);
+    setVoiceTruncated(truncated);
+  }, []);
+  const voice = useSpeechRecognition({ onFinal: onTranscript });
+  const voiceError = speechErrorMessage(voice.error);
+
+  function toggleVoice() {
+    if (voice.listening) {
+      voice.stop();
+    } else {
+      setVoiceUsed(true);
+      voice.start();
+    }
+  }
+
+  /** Sending, a new chat or a request starting ends listening and drops anything not yet final. */
+  function resetVoice() {
+    voice.abort();
+    voice.clearError();
+    setVoiceTruncated(false);
+  }
 
   // Count the seconds while waiting for an answer.
   useEffect(() => {
@@ -53,6 +96,7 @@ export default function CoachPage() {
   async function send(text) {
     const message = text.trim();
     if (!message || pending || message.length > COACH_MAX_CHARS) return;
+    resetVoice();
     const userMessage = { id: newId(), role: 'user', text: message };
     setMessages((list) => [...list, userMessage]);
     setInput('');
@@ -89,6 +133,7 @@ export default function CoachPage() {
   }
 
   function newChat() {
+    resetVoice();
     setConversationId(newId());
     setMessages([]);
     setError('');
@@ -98,6 +143,8 @@ export default function CoachPage() {
 
   const tooLong = input.length > COACH_MAX_CHARS;
   const canSend = !pending && input.trim().length > 0 && !tooLong;
+  const counterWarn = tooLong || voiceTruncated;
+  const voiceAnnouncement = voice.listening ? 'Listening' : voiceUsed ? 'Stopped listening' : '';
 
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col px-4 sm:px-6">
@@ -146,11 +193,17 @@ export default function CoachPage() {
             <ErrorNote>{error}</ErrorNote>
           </div>
         )}
+        {voiceError && (
+          <div className="mb-2">
+            <ErrorNote>{voiceError}</ErrorNote>
+          </div>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
             send(input);
           }}
+          title={voice.supported ? undefined : VOICE_SUPPORT_NOTE}
           className="rounded-2xl bg-surface p-2 shadow-card ring-1 ring-hairline focus-within:ring-2 focus-within:ring-accent/40"
         >
           <label htmlFor={inputId} className="sr-only">
@@ -161,23 +214,45 @@ export default function CoachPage() {
             ref={inputRef}
             rows={2}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setVoiceTruncated(false);
+            }}
             onKeyDown={onKeyDown}
             aria-describedby={counterId}
             aria-invalid={tooLong || undefined}
             placeholder="Ask the Coach… (Enter to send, Shift+Enter for a new line)"
             className="block max-h-48 min-h-[3rem] w-full resize-y bg-transparent px-2.5 py-2 text-sm text-ink placeholder:text-faint focus:outline-none"
           />
+          {voice.listening && <Listening interimText={voice.interimText} />}
           <div className="flex items-center justify-between gap-3 px-1.5 pt-1">
-            <span id={counterId} className={`text-xs tabular-nums ${tooLong ? 'text-danger' : 'text-faint'}`}>
+            <span id={counterId} className={`text-xs tabular-nums ${counterWarn ? 'text-danger' : 'text-faint'}`}>
               {input.length.toLocaleString()} / {COACH_MAX_CHARS.toLocaleString()}
               {tooLong && <span className="sr-only"> characters, too long</span>}
+              {voiceTruncated && !tooLong && <span> · voice input cut at the limit</span>}
             </span>
-            <Button type="submit" icon="send" disabled={!canSend} aria-label={pending ? 'Sending' : 'Send'}>
-              Send
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              {voice.supported && (
+                <Button
+                  variant={voice.listening ? 'dangerGhost' : 'secondary'}
+                  icon={voice.listening ? 'micOff' : 'mic'}
+                  onClick={toggleVoice}
+                  disabled={pending}
+                  aria-label={voice.listening ? 'Stop voice input' : 'Start voice input'}
+                  aria-pressed={voice.listening}
+                  title={VOICE_PRIVACY_NOTE}
+                  className={`px-3 ${voice.listening ? 'bg-danger/10 ring-1 ring-danger/30' : ''}`}
+                />
+              )}
+              <Button type="submit" icon="send" disabled={!canSend} aria-label={pending ? 'Sending' : 'Send'}>
+                Send
+              </Button>
+            </div>
           </div>
         </form>
+        <span className="sr-only" aria-live="polite">
+          {voiceAnnouncement}
+        </span>
         <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-xs text-faint">
           <Icon name="info" className="h-3.5 w-3.5 shrink-0" />
           Not medical advice. Air data is modelled on a 10–40 km grid. For symptoms, see a doctor.
@@ -259,6 +334,27 @@ function CoachAnswer({ message }) {
           </ul>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Shown under the box while the microphone is on: what has been heard so far, greyed, not yet in the box. */
+function Listening({ interimText }) {
+  return (
+    <div data-testid="voice-listening" className="px-2.5 pb-1">
+      <p className="flex items-center gap-2 text-xs font-medium text-danger">
+        <span className="relative flex h-2 w-2" aria-hidden="true">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-danger opacity-60 motion-reduce:hidden" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-danger" />
+        </span>
+        Listening…
+      </p>
+      {interimText && (
+        <p data-testid="voice-interim" className="mt-1 break-words text-sm italic text-faint">
+          {interimText}
+        </p>
+      )}
+      <p className="mt-1 text-[11px] text-faint">{VOICE_PRIVACY_NOTE}</p>
     </div>
   );
 }
