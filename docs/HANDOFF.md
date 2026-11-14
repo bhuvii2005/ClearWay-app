@@ -1,8 +1,8 @@
 # ClearWay AI features: handoff
 
-**Status: shipped.** The AI Coach (PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull/1)) was merged into `main` on 12 Nov 2026 as merge commit `50b5c2d`, and CI on `main` is green.
+**Status: shipped.** The AI Coach (PR [#1](https://github.com/bhuvii2005/ClearWay-app/pull/1)) was merged into `main` on 12 Nov 2026 as merge commit `50b5c2d`, and CI on `main` is green. **Coach voice input** (PR [#5](https://github.com/bhuvii2005/ClearWay-app/pull/5)) followed on 14 Nov 2026 as merge commit `ed8bead`, after the user's manual check.
 
-This file records how the AI work stands, so a fresh session (or person) can pick it up. Last updated **12 Nov 2026, 18:00 IST**. Keep it current: update it at the end of every work session.
+This file records how the AI work stands, so a fresh session (or person) can pick it up. Last updated **14 Nov 2026**. Keep it current: update it at the end of every work session.
 
 The full task list is in `ClearWay — AI Features Implementation Prompt (Coach + RAG + Evals).md` at the repo root. It's untracked on purpose, so don't commit it.
 
@@ -17,8 +17,9 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
 | 4 | Evals (20-case golden set, retrieval eval), Micrometer metrics, per-message log | done; baseline 20/20 (12 Nov, 17:32 IST) |
 | 5 | Coach page in the UI (`/coach`) | done |
 | D | Wrap-up: README Coach section, technical doc, secret scan, full Docker test run, PR | done; **merged** (`50b5c2d`) |
+| V | Coach voice input (Web Speech API, frontend only) | done; **merged** (`ed8bead`, PR #5) |
 
-`feature/ai-coach` is merged; new work goes on new branches from `main`.
+`feature/ai-coach`, `docs/eval-2026-11-12` and `feature/coach-voice-input` are merged and deleted, and so is the accidental `revert-1-feature/ai-coach` branch (never merged). New work goes on new branches from `main`.
 
 ## Commits in PR #1 (oldest first)
 
@@ -102,9 +103,9 @@ The full task list is in `ClearWay — AI Features Implementation Prompt (Coach 
    - one API replica is assumed
 5. **External flakiness:** TomTom, Photon and Open-Meteo sometimes fail the e2e smoke test; this is documented, so rerun it before suspecting the app. Issue [#3](https://github.com/bhuvii2005/ClearWay-app/issues/3) proposes mocking them in the default smoke run and keeping one optional live run (not implemented). A Docker web build once failed with a truncated base-image download, and a retry fixed it.
 
-## Follow-up in progress: Coach voice input (12 Nov 2026)
+## Shipped follow-up: Coach voice input (PR #5, merged 14 Nov 2026)
 
-Branch `feature/coach-voice-input`, rebased onto `main` after PR #4 merged (13 Nov), as one commit. It's frontend only: no backend change, no new npm dependencies and no Gemini quota.
+One commit (`0acc701`), merged as `ed8bead`. It's frontend only: no backend change, no new npm dependencies and no Gemini quota.
 
 **Code:**
 - `smart-routes-ui/src/hooks/useSpeechRecognition.js`: Web Speech API (`SpeechRecognition` or `webkitSpeechRecognition`).
@@ -123,14 +124,14 @@ Branch `feature/coach-voice-input`, rebased onto `main` after PR #4 merged (13 N
 - Coach page load check in real headless Chrome on the dev server: loads, mic shown, no errors, no Coach requests.
 - The full smoke test failed twice on 12 Nov at its planner steps (TomTom compare, then Photon place search), before the Coach step: external flakiness.
 - Screenshot: `docs/screenshots/coach-voice-listening.png`, made with a fake recognizer, because headless Chrome has no speech service. In real headless Chrome, clicking the mic shows the "Microphone access is blocked" error, as designed.
-- **Not yet done:** the user's manual device check (Chrome, Edge, Android Chrome, iOS Safari, Firefox, permission denied, Indian-English accent).
+- The user did a manual check before merging (the checklist covered Chrome, Edge, Android Chrome, iOS Safari, Firefox, permission denied and Indian-English accent).
 
-**State:** pushed with an open PR to `main`, waiting for the user's review and merge. After the rebase: 73 UI tests, lint and build clean.
+**State:** shipped. CI on `main` is green after the merge.
 
 ## Remaining steps
 
-1. The AI feature is shipped; nothing is pending for it apart from issue #2. Merge anything only when the user says so (the user merges with a merge commit, not squash).
-2. Follow-ups get their own branch and PR. Coach voice input is on `feature/coach-voice-input` (above), waiting for review.
+1. The AI Coach and voice input are shipped; open follow-ups are issues #2, #3 and [#6](https://github.com/bhuvii2005/ClearWay-app/issues/6) (Coach actions: plan a route to a nearby place, not implemented). Merge anything only when the user says so (the user merges with a merge commit, not squash).
+2. Follow-ups get their own branch and PR.
 3. Keep this file current after every session.
 
 ## Working rules (from the user)
